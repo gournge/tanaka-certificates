@@ -164,4 +164,123 @@ can offset the positive drift contribution.
 
 \subsection{Sufficiency of piecewise quadratic certificates in dimension one}
 
+In this subsection we will show that piecewise quadratic certificates are sufficient 
+to guarantee that $V(X_t)$ is a supermartingale. 
+
+Let $V$ be piecewise quadratic on $I=[a,b]$, so that on every interval
+$(x_i,x_{i+1})$ we have
+\begin{equation}
+    V(x)=a_ i x^2+ b_i x+ c_i .
+\end{equation}
+Assume also that $V$ is continuous at the breakpoints. Then
+\begin{equation}
+    V'(x)=2a_i x+b_i,
+    \qquad
+    V''(x)=2a_i,
+    \qquad x\in(x_i,x_{i+1}).
+\end{equation}
+Therefore the generator on the interior of a quadratic piece is
+\begin{equation}
+    \mathcal L V(x)
+    =
+    \left(2a_i x+b_i\right)f(x)
+    +
+    a_i g(x)^2.
+    \label{eq:piecewise-quadratic-generator}
+\end{equation}
+
+Here, there are always exists a solution $(a_i,b_i)$ to the interior condition $\mathcal L V(x)\leq 0$ on each piece.
+
+This gives the following sufficient condition.
+
+\begin{fact}
+Let $V$ be continuous and piecewise quadratic on $I=[a,b]$. Suppose that:
+\begin{enumerate}
+    \item on every open piece $(x_i,x_{i+1})$,
+    \begin{equation}
+        \mathcal L V(x)
+        =
+        V'(x)f(x)+\frac12 V''(x)g(x)^2
+        \leq 0;
+        \label{eq:pq-interior-condition}
+    \end{equation}
+    \item at every breakpoint,
+    \begin{equation}
+        V'_+(x_i)-V'_-(x_i)\leq 0;
+        \label{eq:pq-kink-condition}
+    \end{equation}
+    \item the stochastic integral
+    \begin{equation}
+        M_t=\int_0^t V'(X_s)g(X_s)\,dW_s
+    \end{equation}
+    is a martingale.
+\end{enumerate}
+Then $V(X_t)$ is a supermartingale.
+
+\textbf{Proof}. By the Itô--Tanaka formula for a piecewise $C^2$ function,
+\begin{align}
+    V(X_t)
+    &=
+    V(X_0)
+    +
+    \int_0^t
+    \left(
+        V'(X_s)f(X_s)+\frac12 V''(X_s)g(X_s)^2
+    \right)ds                                                   \\
+    &\quad+
+    \int_0^t V'(X_s)g(X_s)\,dW_s                                \\
+    &\quad+
+    \frac12\sum_i
+    \left(V'_+(x_i)-V'_-(x_i)\right)L_t^{x_i}(X).
+\end{align}
+The first term is nonincreasing by
+\eqref{eq:pq-interior-condition}. The stochastic integral is a martingale by
+assumption. Finally, since local time is nondecreasing in $t$, the kink term is
+nonincreasing by \eqref{eq:pq-kink-condition}. 
+Therefore $V(X_t)$ is a supermartingale.
+\end{fact}
+
 \subsection{Connection to Taylor expansion of the best possible certificate}
+
+Let us now again consider the SDE
+\begin{equation}
+    dX_t=dt+\sqrt 2\,dW_t,
+\end{equation}
+the generator is
+\begin{equation}
+    \mathcal L V(x)=V'(x)+V''(x).
+\end{equation}
+A martingale certificate is obtained by asking for the generator to vanish:
+\begin{equation}
+    V'(x)+V''(x)=0.
+    \label{eq:martingale-certificate-ode}
+\end{equation}
+Solving this ODE gives
+\begin{equation}
+    V(x)=C_1+C_2 e^{-x}.
+\end{equation}
+If we impose the normalization $V(0)=0$ and $V(1)=1$, then
+\begin{equation}
+    V_\star(x)
+    =
+    \frac{1-e^{-x}}{1-e^{-1}}.
+    \label{eq:best-certificate-exp}
+\end{equation}
+This is the martingale certificate: $\mathcal L V_\star(x)=0$ on the interior.
+
+Now expand the numerator of \eqref{eq:best-certificate-exp} around $0$:
+\begin{equation}
+    1-e^{-x}
+    =
+    x-\frac{x^2}{2}+\frac{x^3}{6}-\cdots .
+\end{equation}
+The quadratic certificate used above is exactly the second-order truncation of
+this numerator:
+\begin{equation}
+    V_{\mathrm{quad}}(x)
+    =
+    x-\frac{x^2}{2}.
+\end{equation}
+So, up to the constant $(1-e^{-1})^{-1}$ and up to truncation
+error, the quadratic certificate is the Taylor approximation of the martingale
+certificate.
