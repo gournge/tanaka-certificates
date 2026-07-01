@@ -8,7 +8,7 @@ def create_certificate_given_facets(facets: dict[Facet, float]) -> Certificate:
     raise NotImplementedError("This function is not yet implemented.")
 
 
-def _make_pwl_relu_network(xs, ys, L=2, dtype=torch.float64):
+def _make_pwl_relu_network(xs, ys, L=4, dtype=torch.float64):
     """
     Construct an L-layer ReLU network representing the continuous piecewise-linear
     function through the knots (xs[i], ys[i]), with linear extrapolation outside
@@ -186,7 +186,7 @@ def create_1d_certificate_given_breakpoints(
     xs = [xs[0] - 1.0, *xs, xs[-1] + 1.0]
     ys = [ys[0] - leftmost_slope, *ys, ys[-1] + rightmost_slope]
     network = _make_pwl_relu_network(
-        xs, ys, L=2, dtype=torch.get_default_dtype()
+        xs, ys, L=4, dtype=torch.get_default_dtype()
     )
 
     return Certificate(*network.children()).requires_grad_(False)
