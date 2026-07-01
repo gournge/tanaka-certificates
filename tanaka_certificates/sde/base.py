@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-
 State = float | NDArray[np.float64]
 
 
@@ -19,6 +18,18 @@ class SDE(ABC):
     @abstractmethod
     def diffusion(self, t: float, x: State) -> State:
         """Evaluate the diffusion coefficient."""
+
+
+class SDE1D(SDE):
+    """A one-dimensional SDE of the form dX = drift(t, X) dt + diffusion(t, X) dW."""
+
+    def drift(self, t: float, x: float) -> float:
+        """Evaluate the drift coefficient."""
+        return super().drift(t, x)
+
+    def diffusion(self, t: float, x: float) -> float:
+        """Evaluate the diffusion coefficient."""
+        return super().diffusion(t, x)
 
 
 class EulerMaruyama:
@@ -63,4 +74,3 @@ class EulerMaruyama:
             states[index + 1] = self.step(sde, t, states[index], dt, rng)
 
         return times, states
-
