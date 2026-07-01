@@ -21,23 +21,23 @@ from tanaka_certificates.ra import ReachAvoidProblem
             1.0,
             -1.0,
             VerificationResult.VERIFIED,
-        )
-    ],  # V(x) = -abs(x)
-    [
-        [Breakpoint(np.array([0.0]), np.array([0.0]))],
-        -1.0,
-        1.0,
-        VerificationResult.NOT_VERIFIED,
-    ],  # V(x) = abs(x)
-    [
-        [
-            Breakpoint(np.array([0.0]), np.array([0.0])),
-            Breakpoint(np.array([1.0]), np.array([0.1])),
-        ],
-        1.0,
-        -1.0,
-        VerificationResult.VERIFIED,
-    ],  # V(x) = almost a trapezoid with slopes 1, 0.1, -1
+        ),  # V(x) = -abs(x)
+        (
+            [Breakpoint(np.array([0.0]), np.array([0.0]))],
+            -1.0,
+            1.0,
+            VerificationResult.NOT_VERIFIED,
+        ),  # V(x) = abs(x)
+        (
+            [
+                Breakpoint(np.array([0.0]), np.array([0.0])),
+                Breakpoint(np.array([1.0]), np.array([0.1])),
+            ],
+            1.0,
+            -1.0,
+            VerificationResult.VERIFIED,
+        ),  # V(x) = almost a trapezoid with slopes 1, 0.1, -1
+    ],
 )
 def test_verify_brownian_motion(bs, ls, rs, vr):
     v = Verifier1DPiecewiseLinear(
