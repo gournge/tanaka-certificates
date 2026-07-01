@@ -1,14 +1,15 @@
 \section{Piecewise linear certificates in dimension one}
+\label{sec:piecewise-linear}
 
 Consider the following setup:
 
 \begin{setup}
 Let:
 \begin{enumerate}
-    \item $dX_t = f(X_t) dt + g(X_t) dW_t$ be a one-dimensional SDE.
+    \item $dX_t = f(X_t) dt + g(X_t) dW_t$ be a one-dimensional SDE
     \item $V(x)$ be a piecewise linear function such that $V(x) = a_i x + b_i$, where $x \in \left( x_i, x_{i+1} \right)$.
     \item $V(x)$ is continuous at breakpoints: $V(x_i^+)=V(x_i^-) = V(x_i)$
-    \item as a consequence, $V'_{-}(x_i) = a_{i-1},$ $V'_{+}(x_i) = a_i$
+    \item as a consequence, $V'_{-}(x_i) = a_{i-1}$, $V'_{+}(x_i) = a_i$
 \end{enumerate}
 
 \end{setup}
@@ -41,6 +42,7 @@ Some natural assumptions, which are sufficient to guarantee that $V(X_t)$ is a s
   \item $f(x) V'(x) \leq 0$ for all $x \in (x_i, x_{i+1})$. This is because of the following:
   
   \begin{fact}
+  \label{fact:nonpositive-drift-supermartingale}
   If $f(X) V'(X) \leq 0$, then the drift term $D_t$ is a supermartingale. \\
   \linebreak
   \textbf{Proof:} We want to prove $\mathbb{E}[D_t | \mathcal{F}_s] \leq D_s$ for $s \leq t$.

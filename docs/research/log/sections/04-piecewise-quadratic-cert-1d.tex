@@ -1,12 +1,167 @@
 \section{Piecewise quadratic certificates in dimension one}
 \label{sec:piecewise-quadratic}
 
+In this section, we will study a failure regime of the piecewise
+linear certificates in dimension one and see how it leads to sufficiency
+of piecewise quadratic certificates.
 
+Additionally, we observe an interesting connection to the \textit{Taylor expansion} of the best possible
+certificate, namely a martingale certificate for which the generator is zero.
 
-% \section*{Appendix}
+\subsection{Failure of piecewise linear certificates in dimension one}
 
-% \subsection*{One dimensional SDEs}
+We will consider the setup from \autoref{sec:piecewise-linear} again, but with
+additional assumptions on absorption at the boundary, an increase condition on
+the piecewise linear function $V(x)$, and a non-degeneracy condition on the
+diffusion term $g(x)$.
 
-% \subsubsection*{}
+The key point is that the piecewise linear setup is not flexible enough when
+the certificate is required to increase in the same direction as the drift. In
+that case, a piecewise linear function has no curvature term which could
+compensate for the positive drift contribution.
 
+So essentially, we will show that:
+\begin{fact}
+(\textit{Informally.}) There is a case where no piecewise linear certificate can make $V(X_t)$ a
+supermartingale.
+\end{fact}
 
+Although it should be clear from previous sections, for completeness, the setup
+is as follows:
+
+\begin{setup}
+Let:
+    \begin{enumerate}
+        \item $dX_t = f(X_t)dt + g(X_t)dW_t$ be a one-dimensional SDE.
+        \item $V(x)$ be a piecewise linear function such that
+        $V(x)=a_i x+b_i$, where $x\in(x_i,x_{i+1})$.
+        \item $V(x)$ is continuous at breakpoints:
+        $V(x_i^+)=V(x_i^-)=V(x_i)$.
+        \item as a consequence, $V'_{-}(x_i) = a_{i-1}$, $V'_{+}(x_i) = a_i$
+        \item The $X_t$ process is \textbf{absorbed} at the boundary of
+        $I=[a,b]$.
+        \item $V(x)$ has the \textbf{increase condition} at the boundary:
+        \begin{equation}
+        V(a)<V(b).
+        \end{equation}
+        \item $g(x)^2>0$ for all $x\in(a,b)$, i.e. the \textbf{diffusion term is
+        non-degenerate}.
+        \item $M_t$ is a martingale, i.e. the \textbf{martingale condition}.
+        \end{enumerate}
+\end{setup}
+
+Motivated by the example given in \autoref{sec:failure-of-piecewise-linear},
+we will now show that there is a broad class of SDEs for which increasing
+piecewise linear certificates cannot be supermartingales.
+
+\begin{fact}
+Assume that for all $\varepsilon>0$, there exists
+$x\in(a,a+\varepsilon)$ such that
+\begin{equation}
+f(x)>0.
+\label{eq:positive-drift-arbitrarily-close}
+\end{equation}
+Then there is no continuous piecewise linear $V$ satisfying the increase
+condition
+\begin{equation}
+V(a)<V(b)
+\end{equation}
+and the concavity condition
+\begin{equation}
+V'_{+}(x_i)-V'_{-}(x_i)\leq 0
+\end{equation}
+at every breakpoint, such that $V(X_t)$ is a supermartingale.
+
+\textbf{Proof}. Assume, for contradiction, that such a piecewise linear function $V$ exists
+and that $V(X_t)$ is a supermartingale.
+
+Let $p(x)=V'(x)$ on each linear region. Since $V$ is piecewise linear, the
+Itô--Tanaka formula gives
+\begin{align}
+    V(X_t)
+    &=
+    V(X_0)
+    +
+    \int_0^t p(X_s)f(X_s)\,ds                                      \\
+    &\quad
+    +
+    \int_0^t p(X_s)g(X_s)\,dW_s                                    \\
+    &\quad
+    +
+    \frac12\sum_i
+    \left(V'_+(x_i)-V'_-(x_i)\right)L_t^{x_i}(X).
+\end{align}
+The stochastic integral is a martingale by assumption. Therefore, if
+$V(X_t)$ is a supermartingale, the finite-variation part cannot create
+positive drift on any linear region. Hence the necessary interior condition
+is
+\begin{equation}
+    p(x)f(x)\leq 0
+    \qquad
+    \text{on every linear region.}
+    \label{eq:necessary-interior-condition-pl}
+\end{equation}
+
+This also follows from \hyperref[fact:nonpositive-drift-supermartingale]
+  {Fact~\ref*{fact:nonpositive-drift-supermartingale}}
+in \autoref{sec:piecewise-linear}.
+
+We now use the concavity condition. Since
+\begin{equation}
+    V'_+(x_i)-V'_-(x_i)\leq 0
+\end{equation}
+at every breakpoint, the slopes of $V$ are nonincreasing from left to
+right. Therefore $V$ is concave.
+
+Let $(a,x_1)$ be the first linear region. We claim that the slope of $V$ on
+this first region must be positive. Indeed, suppose instead that the first
+slope were nonpositive. Since the slopes are nonincreasing, all later
+slopes would also be nonpositive. Thus,
+\begin{align}
+    V(b)-V(a)
+    &=
+    \int_a^b V'(x)\,dx                                             \\
+    &\leq 0.
+\end{align}
+This contradicts the increase condition $V(a)<V(b)$. Hence the first slope
+must be positive, so
+\begin{equation}
+    p(x)>0
+    \qquad
+    \text{for all }x\in(a,x_1).
+    \label{eq:first-slope-positive-pl}
+\end{equation}
+
+Now use the assumption on the drift. Since for every $\varepsilon>0$ there
+exists $x\in(a,a+\varepsilon)$ such that $f(x)>0$, we may choose
+$\varepsilon=x_1-a$. Then there exists $x^\ast\in(a,x_1)$ such that
+\begin{equation}
+    f(x^\ast)>0.
+\end{equation}
+Combining this with \eqref{eq:first-slope-positive-pl}, we get
+\begin{equation}
+    p(x^\ast)f(x^\ast)>0.
+\end{equation}
+This contradicts the necessary interior condition
+\eqref{eq:necessary-interior-condition-pl}. Therefore no such piecewise
+linear $V$ can make $V(X_t)$ a supermartingale.
+
+\end{fact}
+
+The conclusion is that piecewise linear certificates fail when the certificate
+is forced to increase in the same direction as the drift. The obstruction comes
+from the fact that piecewise linear functions have no interior curvature term.
+Indeed, away from the kinks,
+\begin{equation}
+\mathcal L V(x)=V'(x)f(x),
+\end{equation}
+so a positive drift contribution cannot be compensated. This motivates the
+piecewise quadratic case, where the additional curvature term
+\begin{equation}
+\frac12 V''(x)g(x)^2
+\end{equation}
+can offset the positive drift contribution.
+
+\subsection{Sufficiency of piecewise quadratic certificates in dimension one}
+
+\subsection{Connection to Taylor expansion of the best possible certificate}
