@@ -6,10 +6,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from tanaka_certificates import ResultArtifact
 from tanaka_certificates.sde import BrownianMotion, EulerMaruyama, OrnsteinUhlenbeck
 
 
-DEFAULT_OUTPUT = Path(__file__).resolve().parents[2] / "docs/research/log/figures"
+DEFAULT_OUTPUT = Path("output")
 
 plt.rcParams.update(
     {
@@ -23,7 +24,7 @@ plt.rcParams.update(
 )
 
 
-def simulate_ou(output: Path) -> None:
+def simulate_ou(output_root: Path = DEFAULT_OUTPUT) -> ResultArtifact:
     """Plot the OU decomposition for three noise-to-mean-reversion regimes."""
     rng = np.random.default_rng(7)
     mean_reversion, x0 = 1.0, 1.0
@@ -73,11 +74,13 @@ def simulate_ou(output: Path) -> None:
     axes[0].legend(frameon=False, fontsize=7, loc="best")
     fig.suptitle(r"OU process with $V(x)=x^2$, $\lambda=1$, and $X_0=1$")
     fig.tight_layout()
-    fig.savefig(output / "ou_generator_three_cases.pdf", bbox_inches="tight")
+    artifact = ResultArtifact.create("ou_generator_three_cases", output_root)
+    fig.savefig(artifact.path("ou_generator_three_cases.pdf"), bbox_inches="tight")
     plt.close(fig)
+    return artifact
 
 
-def compare_linear_and_curved(output: Path) -> None:
+def compare_linear_and_curved(output_root: Path = DEFAULT_OUTPUT) -> ResultArtifact:
     """Compare V=x and V=x-x^2/2 for constant drift and diffusion."""
     x = np.linspace(0.0, 1.0, 501)
     v_linear, v_curved = x, x - 0.5 * x**2
@@ -97,11 +100,13 @@ def compare_linear_and_curved(output: Path) -> None:
     axes[1].set(xlabel=r"$x$", ylabel=r"$\mathcal{L}V(x)$", title=r"Generator for $f=1$, $g=\sqrt{2}$")
     axes[1].legend(frameon=False, fontsize=8)
     fig.tight_layout()
-    fig.savefig(output / "linear_failure_curvature_success.pdf", bbox_inches="tight")
+    artifact = ResultArtifact.create("linear_failure_curvature_success", output_root)
+    fig.savefig(artifact.path("linear_failure_curvature_success.pdf"), bbox_inches="tight")
     plt.close(fig)
+    return artifact
 
 
-def simulate_hybrid(output: Path) -> None:
+def simulate_hybrid(output_root: Path = DEFAULT_OUTPUT) -> ResultArtifact:
     """Plot a Brownian path and generalized Ito terms for the hybrid certificate."""
     dt, horizon = 5e-4, 3.0
     n_steps = round(horizon / dt)
@@ -134,18 +139,23 @@ def simulate_hybrid(output: Path) -> None:
     axes[1].set(xlabel=r"$t$", title=r"Terms for $V=-x^2/2$ ($x<0$), $V=-x$ ($x\geq0$)")
     axes[1].legend(frameon=False, ncol=2, fontsize=8)
     fig.tight_layout()
-    fig.savefig(output / "hybrid_piecewise_c2_terms.pdf", bbox_inches="tight")
+    artifact = ResultArtifact.create("hybrid_piecewise_c2_terms", output_root)
+    fig.savefig(artifact.path("hybrid_piecewise_c2_terms.pdf"), bbox_inches="tight")
     plt.close(fig)
+    return artifact
 
 
 def main() -> None:
     parser = ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="artifact root directory")
     args = parser.parse_args()
-    args.output.mkdir(parents=True, exist_ok=True)
-    simulate_ou(args.output)
-    compare_linear_and_curved(args.output)
-    simulate_hybrid(args.output)
+    artifacts = (
+        simulate_ou(args.output),
+        compare_linear_and_curved(args.output),
+        simulate_hybrid(args.output),
+    )
+    for artifact in artifacts:
+        print(artifact.directory)
 
 
 if __name__ == "__main__":

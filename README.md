@@ -11,19 +11,46 @@ Development documentation can be accessed through the [`docs/dev/index.md`](docs
 ## Project structure
 
 ```
+.
 ├── docs
 │   ├── dev
 │   │   └── index.md
 │   └── research
 │       ├── log
-│       │   ├── figures/
-│       │   ├── main.tex
-│       │   └── sections/
+│       │   ├── figures
+│       │   │   ├── hybrid_piecewise_c2_terms.pdf
+│       │   │   ├── linear_failure_curvature_success.pdf
+│       │   │   └── ou_generator_three_cases.pdf
+│       │   └── sections
 │       ├── pdf
 │       │   ├── research-log.pdf
-│       │   └── weekly-reports/
-│       └── weekly-reports/
-└── README.md
+│       │   └── weekly-reports
+│       │       └── 2026-07-01.pdf
+│       └── weekly-reports
+├── pyproject.toml
+├── README.md
+├── scripts
+│   ├── __init__.py
+│   ├── __pycache__
+│   └── research
+│       ├── generate_one_dim_plots.py
+│       ├── __init__.py
+│       └── __pycache__
+├── tanaka_certificates
+│   ├── artifacts.py
+│   ├── __init__.py
+│   ├── __pycache__
+│   └── sde
+│       ├── base.py
+│       ├── constant.py
+│       ├── __init__.py
+│       ├── ornstein_uhlenbeck.py
+│       └── __pycache__
+├── tests
+│   ├── __pycache__
+│   ├── test_artifacts.py
+│   └── test_sde.py
+└── uv.lock
 ```
 
 ## Development
@@ -36,8 +63,11 @@ uv sync --dev
 uv run python -m scripts.research.generate_one_dim_plots
 ```
 
-The plotting command writes to `docs/research/log/figures/` by default. Pass
-`--output PATH` to use another directory. Run the test suite with `uv run pytest`.
+The plotting command writes each result to a named directory containing its
+timestamp and Git revision, such as
+`output/a1b2c3d_2026-07-01_14-30-00_ou_generator_three_cases/`. Pass
+`--output PATH` to use another artifact root. Run the test suite with
+`uv run pytest`.
 
 ### Compiling TeX files
 

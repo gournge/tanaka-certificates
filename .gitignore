@@ -28,3 +28,6 @@ venv/
 build/
 dist/
 *.egg-info/
+
+# Generated experiment artifacts
+output/
