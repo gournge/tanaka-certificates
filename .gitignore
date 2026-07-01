@@ -10,3 +10,21 @@
 *.run.xml
 *.synctex.gz
 *.toc
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+
+# Python package build artefacts
+build/
+dist/
+*.egg-info/

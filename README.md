@@ -28,6 +28,17 @@ Development documentation can be accessed through the [`docs/dev/index.md`](docs
 
 ## Development
 
+Install the Python environment and generate the one-dimensional research plots
+with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv sync --dev
+uv run python -m scripts.research.generate_one_dim_plots
+```
+
+The plotting command writes to `docs/research/log/figures/` by default. Pass
+`--output PATH` to use another directory. Run the test suite with `uv run pytest`.
+
 ### Compiling TeX files
 
 Install a TeX distribution that includes `latexmk`, then run the following
