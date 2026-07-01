@@ -1,0 +1,37 @@
+\section{Piecewise $\mathcal{C}^2$ certificates in dimension one}
+
+The setup is pretty similiar, with the exception that $V$ is now piecewise $\mathcal{C}^2$ instead of piecewise linear. 
+
+\begin{setup}
+Let:
+\begin{enumerate}
+    \item $dX_t = f(X_t) dt + g(X_t) dW_t$ be a one-dimensional SDE.
+    \item $V(x)$ be a piecewise $\mathcal{C}^2$ function such that $V(x) \in \mathcal{C}^2$, where $x \in \left( x_i, x_{i+1} \right)$.
+    \item $V(x)$ is continuous at breakpoints: $V(x_i^+)=V(x_i^-) = V(x_i)$.
+\end{enumerate}
+
+\end{setup}
+
+We will again consider what conditions on $V$ are sufficient to guarantee that $V(X_t)$ is a supermartingale. Again, the natural hypothesis is:
+
+\begin{hypothesis}
+Does concavity of $V(x)$ (along with an interior / drift term condition) guarantee that $V(X_t)$ is a supermartingale?
+\end{hypothesis}
+
+We apply the Itô-Tanaka formula to $V(X_t)$, and we get similiar terms, with the addition of
+\begin{equation}
+  C_t = \frac{1}{2} \int_{0}^{t} V''(X_s) g^2(X_s) ds
+\end{equation}
+
+Since the integral in the $C_t$ term is over the same intervals as the $D_t$ term, we can combine them to recover the generator / Lie derivative term:
+\begin{equation}
+  D_t + C_t = \int_{0}^{t} \left( V'(X_s) f(X_s) + \frac{1}{2} V''(X_s) g^2(X_s) \right) ds = \int_{0}^{t} \mathcal{L} V(X_s) ds
+\end{equation}
+
+The proof that $V(X_t)$ is a supermartingale is similiar to the piecewise linear case, but now we need to impose the condition:
+\begin{equation}
+  \mathcal{L} V(x) = V'(x) f(x) + \frac{1}{2} V''(x) g^2(x) \leq 0
+\end{equation}
+
+\newpage
+
