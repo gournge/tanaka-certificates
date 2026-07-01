@@ -18,38 +18,37 @@ Development documentation can be accessed through the [`docs/dev/index.md`](docs
 │   └── research
 │       ├── log
 │       │   ├── figures
-│       │   │   ├── hybrid_piecewise_c2_terms.pdf
-│       │   │   ├── linear_failure_curvature_success.pdf
-│       │   │   └── ou_generator_three_cases.pdf
 │       │   └── sections
 │       ├── pdf
 │       │   ├── research-log.pdf
 │       │   └── weekly-reports
-│       │       └── 2026-07-01.pdf
 │       └── weekly-reports
 ├── pyproject.toml
 ├── README.md
 ├── scripts
 │   ├── __init__.py
-│   ├── __pycache__
-│   └── research
-│       ├── generate_one_dim_plots.py
-│       ├── __init__.py
-│       └── __pycache__
+│   └── research/
 ├── tanaka_certificates
 │   ├── artifacts.py
+│   ├── certificate.py
+│   ├── facet.py
 │   ├── __init__.py
-│   ├── __pycache__
-│   └── sde
-│       ├── base.py
-│       ├── constant.py
-│       ├── __init__.py
-│       ├── ornstein_uhlenbeck.py
-│       └── __pycache__
+│   ├── nn
+│   │   └── __init__.py
+│   ├── ra.py
+│   ├── regions.py
+│   ├── sde
+│   │   ├── base.py
+│   │   ├── constant.py
+│   │   ├── __init__.py
+│   │   └── ornstein_uhlenbeck.py
+│   └── verifier.py
 ├── tests
-│   ├── __pycache__
 │   ├── test_artifacts.py
-│   └── test_sde.py
+│   ├── test_nn.py
+│   ├── test_sde.py
+│   ├── test_verifier_ornstein_uhlenbeck.py
+│   └── test_verifier.py
 └── uv.lock
 ```
 
