@@ -66,7 +66,7 @@ def test_verifier_ornstein_uhlenbeck_multipiece_network_passes():
 def test_verifier_ornstein_uhlenbeck_fails_when_generator_exceeds_bound():
     verifier = make_ornstein_uhlenbeck_verifier(epsilon=1.1)
     generator_results = []
-    real_generator_check = verifier._generator_is_decreasing
+    real_generator_check = verifier.generator_checker
 
     def record_generator_result(*args):
         result = real_generator_check(*args)
@@ -74,7 +74,7 @@ def test_verifier_ornstein_uhlenbeck_fails_when_generator_exceeds_bound():
         return result
 
     generator_check = Mock(side_effect=record_generator_result)
-    verifier._generator_is_decreasing = generator_check
+    verifier.generator_checker = generator_check
 
     assert verifier.verify() == VerificationResult.NOT_VERIFIED
     generator_check.assert_called_once_with(-2.0, -1.0, -1.0, 1.1)

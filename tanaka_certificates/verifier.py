@@ -5,12 +5,14 @@ unsupported inputs fail closed. See the research log for the underlying theory.
 """
 
 from enum import Enum
+from typing import Callable
 
 import math
 import numpy as np
 from torch import nn
 
 from tanaka_certificates.certificate import Certificate, Certificate1D
+from tanaka_certificates.checker import CheckerCertificateEpsilonDecreasing
 from tanaka_certificates.ra import ReachAvoidProblem, ReachAvoidProblem1D
 from tanaka_certificates.sde.base import SDE, SDE1D
 
@@ -35,6 +37,7 @@ class Verifier1DPiecewiseLinear(Verifier):
         sde: SDE1D,
         reach_avoid_problem: ReachAvoidProblem1D,
         certificate: Certificate1D,
+        generator_checker: Callable[[float, float, float, float], bool] | None = None,
     ):
         """
 
@@ -59,6 +62,11 @@ class Verifier1DPiecewiseLinear(Verifier):
         """
 
         super().__init__(sde, reach_avoid_problem, certificate)
+        self.generator_checker = (
+            CheckerCertificateEpsilonDecreasing(sde)
+            if generator_checker is None
+            else generator_checker
+        )
 
     def verify(self) -> "VerificationResult":
         try:
@@ -91,7 +99,7 @@ class Verifier1DPiecewiseLinear(Verifier):
                         lo, hi, slope, intercept, problem.beta
                     ):
                         for lo, hi in self._outside_target(lo, hi):
-                            if lo < hi and not self._generator_is_decreasing(
+                            if lo < hi and not self.generator_checker(
                                 lo, hi, slope, problem.epsilon
                             ):
                                 return VerificationResult.NOT_VERIFIED
@@ -118,7 +126,7 @@ class Verifier1DPiecewiseLinear(Verifier):
         for lo, hi, slope, _ in pieces:
             for domain in self.reach_avoid_problem.domain.intervals:
                 left, right = max(lo, domain.lower), min(hi, domain.upper)
-                if left < right and not self._generator_is_decreasing(
+                if left < right and not self.generator_checker(
                     left, right, slope, 0.0
                 ):
                     return VerificationResult.NOT_VERIFIED
@@ -258,26 +266,6 @@ class Verifier1DPiecewiseLinear(Verifier):
                         remainder.append((target.upper, right))
             pieces = remainder
         return pieces
-
-    def _generator_is_decreasing(self, lo, hi, slope, epsilon):
-        if epsilon < 0:
-            raise ValueError("epsilon must be nonnegative")
-        # Detect affine drift. This covers the supplied constant and OU SDEs;
-        # failing closed avoids claiming a proof from finite sampling.
-        points = np.array([lo, hi], dtype=float)
-        if not np.all(np.isfinite(points)):
-            return False
-        midpoint = (lo + hi) / 2
-        drift = np.asarray(
-            self.sde.drift(0.0, np.array([lo, midpoint, hi])), dtype=float
-        )
-        if drift.shape == ():
-            drift = np.full(3, float(drift))
-        if drift.shape != (3,) or not np.allclose(drift[1], (drift[0] + drift[2]) / 2):
-            return False
-        maximum_lv = max(slope * drift[0], slope * drift[2])
-        return maximum_lv <= -epsilon
-
 
 class VerificationResult(Enum):
     VERIFIED = "verified"

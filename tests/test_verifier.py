@@ -15,7 +15,7 @@ from tanaka_certificates.nn import create_1d_certificate_given_breakpoints
 from tanaka_certificates.ra import ReachAvoidProblem
 
 
-def make_test_verifier(*, target=None, alpha=0.0, beta=1.0):
+def make_test_verifier(*, target=None, alpha=0.0, beta=1.0, generator_checker=None):
     """Create a small valid verifier for focused tests."""
     return Verifier1DPiecewiseLinear(
         sde=BrownianMotion(),
@@ -31,6 +31,7 @@ def make_test_verifier(*, target=None, alpha=0.0, beta=1.0):
             beta=beta,
             epsilon=0.0,
         ),
+        generator_checker=generator_checker,
     )
 
 
@@ -198,49 +199,52 @@ def test_bad_kink_in_relevant_region_is_rejected():
 
 
 def test_unsafe_failure_short_circuits_remaining_checks():
-    verifier = make_test_verifier()
+    generator_checker = Mock()
+    verifier = make_test_verifier(generator_checker=generator_checker)
     verifier._find_linear_pieces = Mock(return_value=[])
     verifier._minimum_on = Mock(return_value=0.0)
     verifier._maximum_on = Mock()
-    verifier._generator_is_decreasing = Mock()
 
     assert verifier.verify() == VerificationResult.NOT_VERIFIED
     verifier._maximum_on.assert_not_called()
-    verifier._generator_is_decreasing.assert_not_called()
+    generator_checker.assert_not_called()
 
 
 def test_initial_failure_short_circuits_dynamics():
-    verifier = make_test_verifier()
+    generator_checker = Mock()
+    verifier = make_test_verifier(generator_checker=generator_checker)
     verifier._find_linear_pieces = Mock(return_value=[])
     verifier._minimum_on = Mock(return_value=1.0)
     verifier._maximum_on = Mock(return_value=0.5)
-    verifier._generator_is_decreasing = Mock()
 
     assert verifier.verify() == VerificationResult.NOT_VERIFIED
-    verifier._generator_is_decreasing.assert_not_called()
+    generator_checker.assert_not_called()
 
 
 def test_generator_only_checks_sublevel_outside_target():
+    generator_checker = Mock(return_value=True)
     verifier = make_test_verifier(
-        target=IntervalUnion([Interval(-1.0, 0.0)]), alpha=0.0, beta=1.0
+        target=IntervalUnion([Interval(-1.0, 0.0)]),
+        alpha=0.0,
+        beta=1.0,
+        generator_checker=generator_checker,
     )
     verifier._find_linear_pieces = Mock(return_value=[(-np.inf, np.inf, 1.0, 0.0)])
-    verifier._generator_is_decreasing = Mock(return_value=True)
 
     assert verifier.verify() == VerificationResult.VERIFIED
-    assert verifier._generator_is_decreasing.call_args_list == [
+    assert generator_checker.call_args_list == [
         call(-10.0, -1.0, 1.0, 0.0),
         call(0.0, 1.0, 1.0, 0.0),
     ]
 
 
 def test_generator_failure_rejects_certificate():
-    verifier = make_test_verifier()
+    generator_checker = Mock(return_value=False)
+    verifier = make_test_verifier(generator_checker=generator_checker)
     verifier._find_linear_pieces = Mock(return_value=[(-np.inf, np.inf, 0.0, 0.0)])
-    verifier._generator_is_decreasing = Mock(return_value=False)
 
     assert verifier.verify() == VerificationResult.NOT_VERIFIED
-    verifier._generator_is_decreasing.assert_called_once()
+    generator_checker.assert_called_once()
 
 
 def test_degenerate_thresholds_use_legacy_path():
