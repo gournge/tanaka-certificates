@@ -1,474 +1,279 @@
 \documentclass[10pt]{extarticle}
 
 \usepackage[margin=1.8cm]{geometry}
-\usepackage{xcolor}
 \usepackage{amsmath,amssymb}
-\usepackage{tcolorbox}
 \usepackage{enumitem}
 \usepackage{graphicx}
+\usepackage{xcolor}
 \usepackage[
   colorlinks=true,
   linkcolor=blue!50!black,
-  citecolor=green!35!black,
   urlcolor=blue!60!black
 ]{hyperref}
 
-\renewcommand{\sectionautorefname}{Section}
-\renewcommand{\subsectionautorefname}{Section}
-\renewcommand{\figureautorefname}{Figure}
-\renewcommand{\tableautorefname}{Table}
-\renewcommand{\equationautorefname}{Equation}
+\setlist{itemsep=2pt,topsep=4pt}
 
-\setlist[enumerate]{
-  leftmargin=3.5em,
-  itemsep=1pt,
-  topsep=3pt,
-  parsep=0pt,
-  partopsep=0pt
-}
-
-\title{Tanaka Certificates}
-% \author{}
-\date{\today}
-
-\tcbset{
-  notebox/.style={
-    boxrule=0.3pt,
-    arc=0.5mm,
-    left=2mm,
-    right=2mm,
-    top=1.5mm,
-    bottom=1.5mm,
-    fonttitle=\bfseries
-  }
-}
-
-\newtcolorbox{setup}{
-  notebox,
-  title=Setup,
-  colback=blue!2,
-  colbacktitle=blue!12,
-  colframe=blue!25!black,
-  coltitle=blue!45!black
-}
-
-\newtcolorbox{hypothesis}{
-  notebox,
-  title=Hypothesis,
-  colback=yellow!3,
-  colbacktitle=yellow!18,
-  colframe=yellow!45!black,
-  coltitle=yellow!25!black
-}
-
-\newtcolorbox{fact}{
-  notebox,
-  title=Fact,
-  colback=green!2,
-  colbacktitle=green!12,
-  colframe=green!25!black,
-  coltitle=green!30!black
-}
+\title{Tanaka Certificates: Weekly Research Report}
+\author{Filip Morawiec}
+\date{1 July 2026}
 
 \begin{document}
 
 \maketitle
 
 \begin{abstract}
-  In these notes, I am building up the intuition and theory behind supermartingale certificates, with relaxed assumptions on the certificate function $V$. In particular, it is explored what happens when $V$ is not twice continously-differentiable, but instead piecewise twice continuously-differentiable.
+This week I investigated whether nonsmooth neural networks can serve as
+continuous-time supermartingale certificates.  The main theoretical outcome is
+an It\^o--Tanaka characterization for one-dimensional piecewise-smooth
+certificates and a failure result showing that piecewise-linear certificates
+cannot solve an important class of reach--avoid problems.  Curvature removes
+this obstruction, which motivates either piecewise-quadratic certificates or a
+more simply, a network with a bunch of ReLU layers with a piecewise-quadratic in the end.
+I also implemented the first verifier scaffold for one-dimensional ReLU certificates and tested it
+on an Ornstein--Uhlenbeck and a simple Brownian motion example.
 \end{abstract}
 
-\section{Piecewise linear certificates in dimension one}
+\section{Problem setting}
 
-Consider the following setup:
-
-\begin{setup}
-Let:
+Consider a one-dimensional stochastic differential equation
+\begin{equation}
+  dX_t=f(X_t)\,dt+g(X_t)\,dW_t
+  \label{eq:sde}
+\end{equation}
+on a domain $D$.  For a reach--avoid problem, let $X_0\subseteq D$ be the
+initial set, $X_u\subseteq D$ the unsafe set, and $X_\tau\subseteq D$ the target.
+We seek a certificate $V$ and constants $\alpha<\beta$ and $\varepsilon>0$
+such that
 \begin{enumerate}
-    \item $dX_t = f(X_t) dt + g(X_t) dW_t$ be a one-dimensional SDE.
-    \item $V(x)$ be a piecewise linear function such that $V(x) = a_i x + b_i$, where $x \in \left( x_i, x_{i+1} \right)$.
-    \item $V(x)$ is continuous at breakpoints: $V(x_i^+)=V(x_i^-) = V(x_i)$
-    \item as a consequence, $V'_{-}(x_i) = a_{i-1},$ $V'_{+}(x_i) = a_i$
+  \item boundary condition holds: 
+  \begin{equation}
+    \label{eq:boundary-conditions}
+    \sup_{x\in X_0}V(x)\leq\alpha \qquad\text{and}\qquad
+    \inf_{x\in X_u}V(x)\geq\beta
+  \end{equation}
+  \item generator condition holds: 
+  \begin{equation}
+    \label{eq:generator-conditions}
+    \mathcal LV(x)\leq-\varepsilon \qquad\text{for }x\in\{V\leq\beta\}\setminus X_\tau,
+  \end{equation}
 \end{enumerate}
+where, at smooth points,
+\begin{equation}
+  \mathcal LV(x)=V'(x)f(x)+\frac12V''(x)g(x)^2.
+  \label{eq:generator}
+\end{equation}
+The process is stopped after reaching the target or unsafe set: once the
+reach--avoid property has been achieved or violated, its later trajectory is
+irrelevant.
 
-\end{setup}
+In short, these conditions ensure that $V(X_t)$ is a supermartingale (i.e., a decreasing process) that starts below $\alpha$ and is guaranteed to exceed $\beta$ if the process reaches the unsafe
+set.
 
-Now we will consider what conditions on $V$ are sufficient to guarantee that $V(X_t)$ is a supermartingale.
+Previously we would assume $V\in\mathcal C^2$.  ReLU networks are
+instead continuous and piecewise linear.  Their second derivative vanishes
+inside each linear region and is singular at a kink, so the usual It\^o formula
+does not directly capture their behaviour.  This is the reason for studying
+Tanaka certificates.
 
-\begin{hypothesis}
-Does concavity of $V(x)$ (along with an interior / drift term condition) guarantee that $V(X_t)$ is a supermartingale?
-\end{hypothesis}
+\section{Goal of the project}
 
-To answer this, let's apply the Itô-Tanaka formula to $V(X_t)$:
+The first goal of this project is to determine whether nonsmooth verifiers 
+(such as ReLU networks which potentially enable ultra-fast verification, or \textbf{even more interestingly: multiple certificates composed together  
+using $\max$ and $\min$})
+can be used to solve reach--avoid problems.  
+
+Therefore my first task was very simple: analyze the one-dimensional case and determine whether piecewise-linear certificates are expressive enough to solve reach--avoid problems.  
+
+Within this scope, the verifier
+should check the two boundary conditions in
+\eqref{eq:boundary-conditions}, the decrease condition on the sub-$\beta$
+basin outside the target, and the additional conditions introduced at kinks.
+
+\section{Preliminary investigation}
+
+\subsection{The It\^o--Tanaka decomposition}
+
+Let $V$ be continuous and piecewise $\mathcal C^2$, with finitely many
+breakpoints $x_i$.  The It\^o--Tanaka formula gives
 \begin{align}
-    V(X_t) = V(X_0) + &\int_0^t V'(X_s) f(X_s) ds \\
-        + &\int_0^t V'(X_s) g(X_s) dW_s \\
-        + \frac{1}{2} &\sum_{i=1}^{n-1} \left( V'_{+}(x_i) - V'_{-}(x_i) \right) L_t^{x_i}(X) \\
+  V(X_t)=V(X_0)
+  &+\int_0^t \mathcal LV(X_s)\,ds
+  +\int_0^t V'(X_s)g(X_s)\,dW_s \notag\\
+  &+\frac12\sum_i
+  \bigl(V'_+(x_i)-V'_-(x_i)\bigr)L_t^{x_i}(X),
+  \label{eq:tanaka}
 \end{align}
-
-We will focus on these terms: 
-
-\begin{enumerate}
-  \item $D_t = \int_0^t V'(X_s) f(X_s) ds$, the drift term
-  \item $M_t = \int_0^t V'(X_s) g(X_s) dW_s$, the diffusion term (stochastic integral)
-  \item $K_t = \frac{1}{2} \sum_{i=1}^{n-1} \left( V'_{+}(x_i) - V'_{-}(x_i) \right) L_t^{x_i}(X)$, the kink term
-\end{enumerate}
-
-we need to prove that $D_t + M_t + K_t$ is a supermartingale.
-
-Some natural assumptions, which are sufficient to guarantee that $V(X_t)$ is a supermartingale, are the following:
-\begin{enumerate}
-  \item $f(x) V'(x) \leq 0$ for all $x \in (x_i, x_{i+1})$. This is because of the following:
-  
-  \begin{fact}
-  If $f(X) V'(X) \leq 0$, then the drift term $D_t$ is a supermartingale. \\
-  \linebreak
-  \textbf{Proof:} We want to prove $\mathbb{E}[D_t | \mathcal{F}_s] \leq D_s$ for $s \leq t$.
-  \begin{align}
-    \mathbb{E}[D_t | \mathcal{F}_s] &= \mathbb{E}\left[\int_0^t V'(X_u) f(X_u) du \Big| \mathcal{F}_s\right] \\
-    &= \int_0^s V'(X_u) f(X_u) du + \mathbb{E}\left[\int_s^t V'(X_u) f(X_u) du \Big| \mathcal{F}_s\right] \\
-    &\leq D_s + 0 = D_s
-  \end{align}
-  \end{fact}
-
-  \item $M_t$ is a martingale. Assuming $V(x)$ has finitely many pieces
-  (as is the case for a neural network with ReLU activation functions), it is enough
-  to impose a square-integrability condition on $g(x)$\footnote{For example,
-  $\mathbb{E}\!\left[\int_0^t g(X_s)^2\,ds\right]<\infty$.}
-  
-  \item $V'_{+}(x_i) - V'_{-}(x_i) \leq 0 \iff a_{i-1} \geq a_i$, i.e. the \textbf{concavity condition}. This is because of the following:
-  \begin{fact}
-    If $V'_{+}(x_i) - V'_{-}(x_i) \leq 0$ and $L_t^{x_i}(X) \geq 0$, then the kink term $K_t$ is a supermartingale. \\
-    \linebreak
-    \textbf{Proof:} We want to prove $\mathbb{E}[K_t | \mathcal{F}_s] \leq K_s$ for $s \leq t$.
-    \begin{align}
-      \mathbb{E}[K_t | \mathcal{F}_s] &= \mathbb{E}\left[\frac{1}{2} \sum_{i=1}^{n-1} \left( V'_{+}(x_i) - V'_{
--}(x_i) \right) L_t^{x_i}(X) \Big| \mathcal{F}_s\right] \\
-      &= \frac{1}{2} \sum_{i=1}^{n-1} \left( V'_{+}(x_i) - V'_{-}(x_i) \right) \mathbb{E}\left[L_t^{x_i}(X) | \mathcal{F}_s\right] \\
-      &\leq \frac{1}{2} \sum_{i=1}^{n-1} \left( V'_{+}(x_i) - V'_{-}(x_i) \right) L_s^{x_i}(X) = K_s
-    \end{align}
-    Note that the inequality follows from the fact that $L_t^{x_i}(X)$ is non-decreasing in $t$, hence $\mathbb{E}\left[L_t^{x_i}(X) | \mathcal{F}_s\right] \geq \mathbb{E}\left[L_s^{x_i}(X) | \mathcal{F}_s\right] = L_s^{x_i}(X)$.
-  \end{fact}
-
-\end{enumerate}
-
-We will consider what happens in different practical cases to these terms, including: 
-\begin{enumerate}
-  \item A simple one-dimensional SDE with a piecewise linear certificate.
-  \item A pendulum with a stochastic torque, and $X_t$ measuring the angle of the pendulum.
-  \item A network $b$ black and $w$ white nodes, with given transition probabilities, and $X_t$ measuring the amount of mass in the white nodes. 
-\end{enumerate}
-to ensure our assumptions are reasonable.
-
-\subsection{Proof of the supermartingale property}
-
-First, let's note the following:
-
-\begin{fact}
-  The sum of a martingale and a supermartingale is a supermartingale. \\
-  \linebreak
-  \textbf{Proof}: By definition, given a martingale $M_t$ and a supermartingale $S_t$, for $r < t$ we have 
-  $\mathbb{E}[M_t | \mathcal{F}_r] = M_r$ and 
-  $\mathbb{E}[M_t | \mathcal{F}_r] \leq S_r$. Then, for $r < t$:
-  \begin{align}
-    \mathbb{E}[M_t + S_t | \mathcal{F}_r] &= \mathbb{E}[M_t | \mathcal{F}_r] + \mathbb{E}[S_t | \mathcal{F}_r] \\
-    &= M_r + \mathbb{E}[S_t | \mathcal{F}_r] \\
-    &\leq M_r + S_r = (M + S)_r
-  \end{align}
-\
-hence $M_t + S_t$ is a supermartingale.
-
-\end{fact}
-
-The drift term $D_t$ is a supermartingale by assumption 1. The kink term $K_t$ is a supermartingale by assumption 3. The stochastic integral $M_t$ is a martingale by assumption 2. Therefore, the sum of these three terms is a supermartingale (as a consequence of the previous fact), and hence $V(X_t)$ is a supermartingale.
-
-\section{Piecewise $\mathcal{C}^2$ certificates in dimension one}
-
-The setup is pretty similiar, with the exception that $V$ is now piecewise $\mathcal{C}^2$ instead of piecewise linear. 
-
-\begin{setup}
-Let:
-\begin{enumerate}
-    \item $dX_t = f(X_t) dt + g(X_t) dW_t$ be a one-dimensional SDE.
-    \item $V(x)$ be a piecewise $\mathcal{C}^2$ function such that $V(x) \in \mathcal{C}^2$, where $x \in \left( x_i, x_{i+1} \right)$.
-    \item $V(x)$ is continuous at breakpoints: $V(x_i^+)=V(x_i^-) = V(x_i)$.
-\end{enumerate}
-
-\end{setup}
-
-We will again consider what conditions on $V$ are sufficient to guarantee that $V(X_t)$ is a supermartingale. Again, the natural hypothesis is:
-
-\begin{hypothesis}
-Does concavity of $V(x)$ (along with an interior / drift term condition) guarantee that $V(X_t)$ is a supermartingale?
-\end{hypothesis}
-
-We apply the Itô-Tanaka formula to $V(X_t)$, and we get similiar terms, with the addition of
-\begin{equation}
-  C_t = \frac{1}{2} \int_{0}^{t} V''(X_s) g^2(X_s) ds
-\end{equation}
-
-Since the integral in the $C_t$ term is over the same intervals as the $D_t$ term, we can combine them to recover the generator / Lie derivative term:
-\begin{equation}
-  D_t + C_t = \int_{0}^{t} \left( V'(X_s) f(X_s) + \frac{1}{2} V''(X_s) g^2(X_s) \right) ds = \int_{0}^{t} \mathcal{L} V(X_s) ds
-\end{equation}
-
-The proof that $V(X_t)$ is a supermartingale is similiar to the piecewise linear case, but now we need to impose the condition:
-\begin{equation}
-  \mathcal{L} V(x) = V'(x) f(x) + \frac{1}{2} V''(x) g^2(x) \leq 0
-\end{equation}
-
-\newpage
-
-\section{Studying piecewise certificates on concrete one-dimensional examples}
-
-Some useful examples to study are given in Tables~\ref{tab:kink-examples}
-and~\ref{tab:curvature-examples}.
-
-\begin{table}[t]
-\centering
-\caption{Piecewise linear certificates examples.}
-\label{tab:kink-examples}
-\begin{tabular}{lllll}
-\hline
-SDE & $V(x)$ & $D_t$ & $M_t$ & $K_t$ \\
-\hline
-$dX_t=dW_t$
-&
-$-|x|$
-&
-$0$
-&
-$\displaystyle \int_0^t -\operatorname{sgn}(X_s)\,dW_s$
-&
-$\displaystyle -L_t^0(X)$
-\\[1.1em]
-
-% $dX_t=dW_t$
-% &
-% $|x|$
-% &
-% $0$
-% &
-% $\displaystyle \int_0^t \operatorname{sgn}(X_s)\,dW_s$
-% &
-% $\displaystyle L_t^0(X)$
-% \\[1.1em]
-
-$dX_t=-X_t\,dt$
-&
-$|x|$
-&
-$\displaystyle -\int_0^t |X_s|\,ds$
-&
-$0$
-&
-$0$
-\\
-\hline
-\end{tabular}
-\end{table}
-
-\begin{table}[t]
-\centering
-\caption{Piecewise $\mathcal{C}^2$ certificates examples.}
-\label{tab:curvature-examples}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{llllll}
-\hline
-SDE & $V(x)$ & $D_t$ & $M_t$ & $C_t$ & $K_t$ \\
-\hline
-$dX_t=-\lambda X_t\,dt+\sigma\,dW_t$
-&
-$x^2$
-&
-$\displaystyle -2\lambda \int_0^t X_s^2\,ds$
-&
-$\displaystyle \int_0^t 2\sigma X_s\,dW_s$
-&
-$\displaystyle \sigma^2 t$
-&
-$0$
-\\[1.1em]
-
-$dX_t=dt+\sqrt{2}\,dW_t$
-&
-$\displaystyle x-\frac{x^2}{2}$
-&
-$\displaystyle \int_0^t (1-X_s)\,ds$
-&
-$\displaystyle \int_0^t (1-X_s)\sqrt{2}\,dW_s$
-&
-$\displaystyle -t$
-&
-$0$
-\\[1.1em]
-
-$dX_t=dW_t$
-&
-$\displaystyle
-\begin{cases}
--\frac12 x^2, & x<0,\\
--x, & x\ge 0
-\end{cases}$
-&
-$0$
-&
-$\displaystyle \int_0^t V'(X_s)\,dW_s$
-&
-$\displaystyle -\frac12\int_0^t \mathbf 1_{\{X_s<0\}}\,ds$
-&
-$\displaystyle -\frac12 L_t^0(X)$
-\\
-\hline
-\end{tabular}%
-}
-\end{table}
-
-\subsection{Ornstein--Uhlenbeck process in three parameter regimes}
-
-Consider the Ornstein--Uhlenbeck process
-\[
-  dX_t=-\lambda X_t\,dt+\sigma\,dW_t
-\]
-with the quadratic certificate $V(x)=x^2$. Its generator is
-\[
-  \mathcal LV(x)=-2\lambda x^2+\sigma^2
-  =-2\lambda\left(x^2-\frac{\sigma^2}{2\lambda}\right).
-\]
-Consequently, if
-\[
-  r=\frac{\sigma}{\sqrt{2\lambda}},
-\]
-then the generator is negative for $|x|>r$, zero for $|x|=r$, and positive
-for $|x|<r$. The decomposition is
-\[
-  X_t^2-X_0^2
-  =\underbrace{-2\lambda\int_0^t X_s^2\,ds}_{D_t}
-  +\underbrace{2\sigma\int_0^t X_s\,dW_s}_{M_t}
-  +\underbrace{\sigma^2t}_{C_t},
-\]
-with $K_t=0$.
-
-Figure~\ref{fig:ou-terms} fixes $\lambda=1$ and $X_0=1$, and uses
-$r=0.5$, $r=1$, and $r=1.5$. These choices make the initial generator
-negative, zero, and positive, respectively. Moreover,
-\[
-  \mathbb E[X_t^2]
-  =r^2+(X_0^2-r^2)e^{-2\lambda t},
-\]
-so the expected generator retains the corresponding sign. In the middle
-case, $X_t^2$ is constant in expectation, but it is not a martingale: the
-pointwise generator vanishes only when $|X_t|=r$.
-
-The stochastic integral $M_t$ need not visibly oscillate on every individual
-sample path; the martingale statement is instead that its conditional drift
-is zero. Figure~\ref{fig:ou-terms} therefore plots Monte Carlo expectations.
-The mean of $M_t$ remains statistically consistent with zero, while $D_t$ and
-$C_t$ determine whether $\mathbb E[X_t^2-X_0^2]$ decreases, remains zero, or
-increases.
+where $L_t^{x_i}(X)$ is local time.  Subject to the usual integrability
+condition making the stochastic integral a martingale, two sign conditions are
+sufficient for $V(X_t)$ to be a supermartingale:
+\begin{align}
+  \mathcal LV(x)&\leq0 &&\text{inside every smooth piece},
+  \label{eq:interior}\\
+  V'_+(x_i)-V'_-(x_i)&\leq0 &&\text{at every relevant kink}.
+  \label{eq:kink}
+\end{align}
+For a piecewise-linear $V$, condition \eqref{eq:kink} says that
+the slopes may only decrease: $V$ must be concave on the region where the
+certificate condition is imposed; Figure~\ref{fig:concavity-condition}
+illustrates a valid and an invalid sequence of slopes.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{../log/figures/ou_generator_three_cases.pdf}
-  \caption{Monte Carlo expectations from $8000$ Ornstein--Uhlenbeck paths for
-  $V(x)=x^2$. The three columns use
-  $\sigma/\sqrt{2\lambda}=0.5,1,1.5$. The shaded region is a pointwise
-  approximate 95\% Monte Carlo band for $\mathbb E[M_t]$.}
-  \label{fig:ou-terms}
+  \includegraphics[width=0.9\textwidth]{../log/figures/concavity_condition.pdf}
+  \caption{The Tanaka kink condition for a continuous piecewise-linear
+  certificate.  Decreasing slopes give nonpositive derivative jumps and hence
+  a concave certificate (left).  An increase in slope creates a positive
+  derivative jump and violates the condition (right).}
+  \label{fig:concavity-condition}
 \end{figure}
 
-\subsection{Failure of piecewise linearity and success of curvature}
+Meanwhile $V''=0$ inside every piece, so
+\begin{equation}
+  \mathcal LV(x)=V'(x)f(x).
+  \label{eq:pl-generator}
+\end{equation}
 
-For $f=1$ and $g=\sqrt{2}$ on $[0,1]$, consider a case where want to find a certificate $V$ such that $V(0) = 0$ and $V(1) = 1$.
+The fact that $V''=0$ inside every linear piece yields a problem, which is illustrated in the next subsection.
 
-% the increasing linear candidate
-% $V_{\mathrm{PL}}(x)=x$ has
-% \[
-%   \mathcal{L}V_{\mathrm{PL}}(x)=1>0.
-% \]
-% More generally, an increasing piecewise-linear certificate must have positive
-% slope on some open interval; on that interval its curvature vanishes and
-% $\mathcal{L}V=V'>0$. 
+\subsection{A motivating counterexample}
 
-A smooth candidate could be:
-\[
-  V_{\mathcal C^2}(x)=x-\frac{x^2}{2},
-\]
-the curvature contribution compensates for the positive drift:
-\[
-  \mathcal{L}V_{\mathcal C^2}(x)
-  =(1-x)+\frac12(-1)(2)=-x\leq0.
-\]
-
-and indeed $V_{\mathcal C^2}$ is a valid supermartingale certificate.
-
-On the other hand, let's assume $V$ is piecewise linear. 
-Then there exists an interval $(x_i, x_{i+1}) \subset [0,1]$ where $V'(x) = a_i > 0$. On that interval, given an $x \in (x_i, x_{i+1})$, the curvature term vanishes, and the generator is
-\[
-  \mathcal{L}V(x) = V'(x) f(x) + \frac{1}{2} V''(x) g^2(x) = V'(x) f(x) = V'(x) = a_i > 0.
-\]
-
-This example motivates the following hypothesis, which we will study in more detail in \autoref{sec:piecewise-quadratic}.
-
-\begin{hypothesis}
-  While piecewise linear certificates $V_{\mathrm{PL}}$ are not sufficient to guarantee that $V_{\mathrm{PL}}$ is a supermartingale, \textbf{piecewise quadratic certificates} are sufficient, as the curvature term can compensate for positive drift.
-\end{hypothesis}
+For
+\begin{equation}
+  dX_t=dt+\sqrt2\,dW_t,
+  \qquad x\in[0,1],
+  \label{eq:constant-sde}
+\end{equation}
+suppose the boundary requirements are $V(0)=0$ and $V(1)=1$.  Any continuous
+piecewise-linear function satisfying them must have positive slope somewhere.
+At such a point, \eqref{eq:pl-generator} is positive, so the generator condition
+fails.  In contrast, the normalized quadratic candidate
+\begin{equation}
+  V_{\mathrm{quad}}(x)=2x-x^2
+\end{equation}
+satisfies the same boundary conditions and
+\begin{equation}
+  \mathcal LV_{\mathrm{quad}}(x)=V'_{\mathrm{quad}}(x)
+  +V''_{\mathrm{quad}}(x)=-2x\leq0.
+\end{equation}
+Thus the diffusion term can use negative curvature to compensate for positive
+drift, while a linear piece cannot.  Figure~\ref{fig:motivating-counterexample}
+compares a concave piecewise-linear candidate, the quadratic candidate, and
+the exact martingale certificate under identical boundary conditions.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{../log/figures/linear_failure_curvature_success.pdf}
-  \caption{An increasing piecewise-linear candidate fails the generator
-  condition for $f=1$, $g=\sqrt{2}$, whereas negative curvature makes the
-  smooth candidate satisfy it throughout $[0,1]$.}
-  \label{fig:linear-vs-curved}
+  \includegraphics[width=\textwidth]{../log/figures/motivating_counterexample.pdf}
+  \caption{The motivating counterexample with all candidates normalized by
+  $V(0)=0$ and $V(1)=1$.  Even a concave piecewise-linear candidate has a
+  positive generator on each affine piece.  Negative curvature makes the
+  quadratic generator nonpositive, while the exact certificate has zero
+  generator.}
+  \label{fig:motivating-counterexample}
 \end{figure}
 
+The exact martingale certificate for this example solves
+$V'+V''=0$.  With $V(0)=0$ and $V(1)=1$, it is
+\begin{equation}
+  V_\star(x)=\frac{1-e^{-x}}{1-e^{-1}}.
+  \label{eq:exact-certificate}
+\end{equation}
+Since
+\begin{equation}
+  1-e^{-x}=x-\frac{x^2}{2}+\frac{x^3}{6}-\cdots,
+\end{equation}
+the normalized quadratic candidate is the correspondingly normalized
+second-order Taylor approximation of the exact martingale certificate.  This
+gives a constructive
+interpretation of why quadratic certificates are useful, but does not claim
+that they are necessary.
+
+\section{First theoretical results}
+
+\subsection{A class for which piecewise-linear certificates fail}
+
+\paragraph{Theorem (one-sided failure).}
+Let \eqref{eq:sde} be stopped at the boundary of $[a,b]$, with
+$g(x)^2>0$ in $(a,b)$.  Suppose that positive drift occurs arbitrarily close
+to the left boundary:
+\begin{equation}
+  \text{for every }\delta>0\text{ there is }x\in(a,a+\delta)
+  \text{ such that }f(x)>0.
+  \label{eq:positive-drift}
+\end{equation}
+There is no continuous, piecewise-linear certificate $V$ that simultaneously
+satisfies $V(a)<V(b)$, the kink condition \eqref{eq:kink}, and the
+supermartingale condition on all interior linear regions.
+
+\paragraph{Proof.}
+The kink condition makes the slopes of $V$ nonincreasing from left to right.
+If the slope on the first linear region were nonpositive, every later slope
+would also be nonpositive, contradicting $V(a)<V(b)$.  Hence the first slope
+$p$ is positive.  By \eqref{eq:positive-drift}, that region contains a point
+$x^\ast$ with $f(x^\ast)>0$.  At this smooth point,
+\begin{equation}
+  \mathcal LV(x^\ast)=p f(x^\ast)>0,
+\end{equation}
+contradicting the necessary interior condition. \hfill$\square$
+
+There is a symmetric result for a decreasing boundary requirement and negative
+drift near the right boundary.  The theorem also clarifies that failure is not
+universal: piecewise-linear certificates can work when their slopes have the
+opposite sign to the drift.  For example, for the deterministic
+Ornstein--Uhlenbeck dynamics $dX_t=-X_t\,dt$, $V(x)=|x|$ has
+$\mathcal LV=-|x|\leq0$ away from its kink.
+
+\subsection{Sufficiency for piecewise-quadratic certificates}
+
+Let $V$ be continuous and piecewise quadratic.  If
+\begin{enumerate}
+  \item $\mathcal LV\leq0$ in the interior of every quadratic piece,
+  \item $V'_+(x_i)-V'_-(x_i)\leq0$ at every breakpoint, and
+  \item $\int_0^tV'(X_s)g(X_s)\,dW_s$ is a martingale,
+\end{enumerate}
+then \eqref{eq:tanaka} immediately shows that $V(X_t)$ is a supermartingale.
+This is a sufficient condition for a proposed certificate, not a claim that a
+piecewise-quadratic certificate exists for every SDE or that quadratic degree
+is necessary.
+
+An unrestricted deep network with quadratic activations would produce
+high-degree polynomial pieces and make verification expensive.  A more
+promising architecture is therefore a ReLU network whose final layer is
+smooth.  Most of the feature extraction would remain piecewise linear and
+cheap, while the certificate output would possess the curvature needed in
+examples such as \eqref{eq:constant-sde}.
+
+\section{Verifier scaffold}
+
+I implemented a verifier for ReLU Neural Network certificates for
+one-dimensional SDEs.  It currently:
+\begin{enumerate}
+  \item directly extracts the "pieces" of a ReLU neural network;
+  \item checks $\inf_{X_u}V\geq\beta$ and
+        $\sup_{X_0}V\leq\alpha$ over unions of intervals;
+  \item restricts verification to the sub-$\beta$ basin outside the target;
+  \item checks $V'f\leq-\varepsilon$ on every relevant smooth segment; and
+  \item checks the concativity Tanaka condition at every relevant kink.
+\end{enumerate}
+
+I currently also assume that $f(x)$ is a linear function. I use this assumption 
+because I need to check $\sup_{x \in [l, u]} \mathcal{L}V(x) = \sup_{x \in [l, u]} a_i f(x)$.
+Perhaps the user would also supply a method \texttt{OneDimensionalSDE.drift\_bounds(lower, upper) -> (lower, upper)} t
+hat returns the bounds of $f(x)$ on the interval $[\texttt{lower}, \texttt{upper}]$.
 
 
-\subsection{A piecewise $\mathcal{C}^2$ certificate with curvature and a kink}
+% The test suite currently contains 34 passing tests.  Besides unit tests for
+% network piece extraction and interval operations, it contains an integrated
+% Ornstein--Uhlenbeck example.  For
+% \begin{equation}
+%   dX_t=-X_t\,dt,
+% \end{equation}
+% the certificate behaves as $V(x)=|x|$ outside the target.  Consequently
+% $\mathcal LV=-|x|$, and the verifier accepts $\varepsilon=1$ on the selected
+% basin but rejects $\varepsilon=1.1$, as expected.
 
-Finally, let $dX_t=dW_t$ and
-\[
-  V(x)=
-  \begin{cases}
-    -\frac12x^2, & x<0,\\
-    -x, & x\geq0.
-  \end{cases}
-\]
-Here $D_t=0$, while
-\[
-  M_t=\int_0^t V'(X_s)\,dW_s,
-  \qquad
-  C_t=-\frac12\int_0^t\mathbf{1}_{\{X_s<0\}}\,ds,
-  \qquad
-  K_t=-\frac12L_t^0(X).
-\]
-Thus $C_t$ decreases while the path lies below zero, and $K_t$ decreases only
-when local time accumulates at the kink. Figure~\ref{fig:hybrid-terms} shows
-these different mechanisms on the same Brownian realization. The plotted
-local time uses an occupation-density approximation with bandwidth $0.06$.
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{../log/figures/hybrid_piecewise_c2_terms.pdf}
-  \caption{A Brownian realization and the terms for the hybrid piecewise
-  $\mathcal C^2$ certificate. The curvature and kink terms are both
-  nonincreasing, while the martingale term fluctuates.}
-  \label{fig:hybrid-terms}
-\end{figure}
-
-\newpage
-
-\section{Piecewise quadratic certificates in dimension one}
-\label{sec:piecewise-quadratic}
-
-
-
-% \section*{Appendix}
-
-% \subsection*{One dimensional SDEs}
-
-% \subsubsection*{}
-
+% The present verifier is a scaffold rather than a complete multidimensional
+% method.  Its exact region enumeration is appropriate for the one-dimensional
+% study but can grow exponentially with network depth.  The generator check is
+% also limited to affine drift and piecewise-linear certificates.
 
 \end{document}

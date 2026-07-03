@@ -5,8 +5,10 @@ description = "Numerical experiments for one-dimensional Tanaka certificates"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "auto-lirpa",
     "matplotlib>=3.10",
     "numpy>=2.0",
+    "torch>=2.11,<2.12",
 ]
 
 [dependency-groups]
@@ -23,3 +25,6 @@ packages = ["tanaka_certificates"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.uv.sources]
+auto-lirpa = { git = "https://github.com/Verified-Intelligence/auto_LiRPA.git" }
