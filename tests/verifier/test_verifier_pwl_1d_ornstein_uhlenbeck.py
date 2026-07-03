@@ -25,7 +25,7 @@ from tanaka_certificates.facet import Breakpoint
 from tanaka_certificates.nn import create_1d_certificate_given_breakpoints
 from tanaka_certificates.ra import ReachAvoidProblem1D
 from tanaka_certificates.regions import Interval, IntervalUnion
-from tanaka_certificates.sde import OrnsteinUhlenbeck
+from tanaka_certificates.sde import OrnsteinUhlenbeck1D
 from tanaka_certificates.verifier import (
     VerificationResult,
     Verifier1DPiecewiseLinear,
@@ -34,7 +34,7 @@ from tanaka_certificates.verifier import (
 
 def make_ornstein_uhlenbeck_verifier(epsilon):
     return Verifier1DPiecewiseLinear(
-        sde=OrnsteinUhlenbeck(mean_reversion=1.0, volatility=1.0, long_term_mean=0.0),
+        sde=OrnsteinUhlenbeck1D(mean_reversion=1.0, volatility=1.0, long_term_mean=0.0),
         certificate=create_1d_certificate_given_breakpoints(
             [
                 Breakpoint(np.array([-0.5]), np.array([0.5])),

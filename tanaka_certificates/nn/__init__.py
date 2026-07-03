@@ -8,6 +8,17 @@ def create_certificate_given_facets(facets: dict[Facet, float]) -> Certificate:
     raise NotImplementedError("This function is not yet implemented.")
 
 
+def create_multidim_certificate(
+    breakpoints: list[Breakpoint],
+    leftmost_slope: float,
+    rightmost_slope: float,
+) -> Certificate:
+    """Construct a multidimensional certificate once its representation exists."""
+    raise NotImplementedError(
+        "Multidimensional certificate construction is not implemented yet."
+    )
+
+
 def _make_pwl_relu_network(xs, ys, L=4, dtype=torch.float64):
     """
     Construct an L-layer ReLU network representing the continuous piecewise-linear

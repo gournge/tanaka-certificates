@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from tanaka_certificates import ResultArtifact
-from tanaka_certificates.sde import BrownianMotion, EulerMaruyama, OrnsteinUhlenbeck
+from tanaka_certificates.sde import BrownianMotion, EulerMaruyama, OrnsteinUhlenbeck1D
 
 
 DEFAULT_OUTPUT = Path("output")
@@ -30,7 +30,7 @@ def simulate_ou(output_root: Path = DEFAULT_OUTPUT) -> ResultArtifact:
     mean_reversion, x0 = 1.0, 1.0
     ratios = (0.5, 1.0, 1.5)
     models = tuple(
-        OrnsteinUhlenbeck(mean_reversion, np.sqrt(2.0 * mean_reversion) * ratio)
+        OrnsteinUhlenbeck1D(mean_reversion, np.sqrt(2.0 * mean_reversion) * ratio)
         for ratio in ratios
     )
     dt, horizon = 1e-3, 1.5

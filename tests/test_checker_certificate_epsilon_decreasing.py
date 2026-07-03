@@ -1,7 +1,7 @@
 import pytest
 
 from tanaka_certificates.checker import CheckerCertificateEpsilonDecreasing
-from tanaka_certificates.sde import OrnsteinUhlenbeck
+from tanaka_certificates.sde import OrnsteinUhlenbeck1D
 from tanaka_certificates.sde.constant import BrownianMotion
 
 
@@ -11,7 +11,7 @@ def test_checker_certificate_epsilon_decreasing_proves_ou_generator_bound():
     Thus LV <= -epsilon holds for epsilon=1, but fails for epsilon=1.1.
     """
     checker = CheckerCertificateEpsilonDecreasing(
-        OrnsteinUhlenbeck(mean_reversion=1.0, volatility=1.0, long_term_mean=0.0)
+        OrnsteinUhlenbeck1D(mean_reversion=1.0, volatility=1.0, long_term_mean=0.0)
     )
 
     assert checker(-2.0, -1.0, -1.0, 1.0)

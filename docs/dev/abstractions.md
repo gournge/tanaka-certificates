@@ -20,7 +20,8 @@ SDE + ReachAvoidProblem1D + Certificate1D
 dX_t = drift(t, X_t) dt + diffusion(t, X_t) dW_t.
 ```
 
-`BrownianMotion`, `ConstantCoefficients`, and `OrnsteinUhlenbeck` are supplied
+`BrownianMotion`, `ConstantCoefficients`, `OrnsteinUhlenbeck1D`, and
+`IsotropicOrnsteinUhlenbeck` are supplied
 models. `EulerMaruyama` is a numerical experiment tool: it simulates one path
 per initial state, but does not participate in formal verification.
 

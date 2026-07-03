@@ -9,9 +9,9 @@ a NumPy-compatible batch of scalar states. A seed makes an experiment
 reproducible.
 
 ```python
-from tanaka_certificates.sde import EulerMaruyama, OrnsteinUhlenbeck
+from tanaka_certificates.sde import EulerMaruyama, OrnsteinUhlenbeck1D
 
-sde = OrnsteinUhlenbeck(
+sde = OrnsteinUhlenbeck1D(
     mean_reversion=1.0,
     volatility=0.5,
     long_term_mean=0.0,
@@ -76,7 +76,7 @@ from tanaka_certificates.facet import Breakpoint
 from tanaka_certificates.nn import create_1d_certificate_given_breakpoints
 from tanaka_certificates.ra import ReachAvoidProblem1D
 from tanaka_certificates.regions import Interval, IntervalUnion
-from tanaka_certificates.sde import OrnsteinUhlenbeck
+from tanaka_certificates.sde import OrnsteinUhlenbeck1D
 from tanaka_certificates.verifier import (
     VerificationResult,
     Verifier1DPiecewiseLinear,
@@ -106,7 +106,7 @@ problem = ReachAvoidProblem1D(
 )
 
 result = Verifier1DPiecewiseLinear(
-    sde=OrnsteinUhlenbeck(),
+    sde=OrnsteinUhlenbeck1D(),
     reach_avoid_problem=problem,
     certificate=certificate,
 ).verify()

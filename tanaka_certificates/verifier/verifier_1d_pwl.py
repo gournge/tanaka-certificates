@@ -4,31 +4,17 @@ Only affine-drift 1D SDEs and Linear/ReLU certificates are currently supported;
 unsupported inputs fail closed. See the research log for the underlying theory.
 """
 
-from enum import Enum
 from typing import Callable
 
 import math
 import numpy as np
 from torch import nn
 
-from tanaka_certificates.certificate import Certificate, Certificate1D
+from tanaka_certificates.certificate import Certificate1D
 from tanaka_certificates.checker import CheckerCertificateEpsilonDecreasing
-from tanaka_certificates.ra import ReachAvoidProblem, ReachAvoidProblem1D
-from tanaka_certificates.sde.base import SDE, SDE1D
-
-
-class Verifier:
-    def __init__(
-        self, sde: SDE, reach_avoid_problem: ReachAvoidProblem, certificate: Certificate
-    ):
-        self.certificate = certificate
-        self.reach_avoid_problem = reach_avoid_problem
-        self.sde = sde
-
-    def verify(self) -> "VerificationResult":
-        raise NotImplementedError(
-            "Verification for a general case is not implemented yet."
-        )
+from tanaka_certificates.ra import ReachAvoidProblem1D
+from tanaka_certificates.sde.base import SDE1D
+from tanaka_certificates.verifier.base import Verifier, VerificationResult
 
 
 class Verifier1DPiecewiseLinear(Verifier):
@@ -126,9 +112,7 @@ class Verifier1DPiecewiseLinear(Verifier):
         for lo, hi, slope, _ in pieces:
             for domain in self.reach_avoid_problem.domain.intervals:
                 left, right = max(lo, domain.lower), min(hi, domain.upper)
-                if left < right and not self.generator_checker(
-                    left, right, slope, 0.0
-                ):
+                if left < right and not self.generator_checker(left, right, slope, 0.0):
                     return VerificationResult.NOT_VERIFIED
         for left, right in zip(pieces, pieces[1:]):
             x = left[1]
@@ -266,7 +250,3 @@ class Verifier1DPiecewiseLinear(Verifier):
                         remainder.append((target.upper, right))
             pieces = remainder
         return pieces
-
-class VerificationResult(Enum):
-    VERIFIED = "verified"
-    NOT_VERIFIED = "not_verified"
