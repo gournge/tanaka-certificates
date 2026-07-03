@@ -94,8 +94,39 @@ Substituting the quadratic form gives
 \frac{1}{2}\operatorname{tr}\!\left(a(x)Q_i\right).
 \]
 
-Now let $F_{ij} = K_i \cap K_j$ be a shared interface between two neighbouring
-cells. Let $n_{ij}$ be the unit normal vector pointing from $K_i$ into $K_j$.
+For $i\neq j$, let
+\[
+  \mathcal F_{ij}
+  =
+  \left\{
+    F:
+    F \text{ is a connected }(d-1)\text{-dimensional face of }
+    K_i\cap K_j
+  \right\}.
+\]
+
+\begin{sidenote}
+Each cell $K_i$ carries its own quadratic piece $V_i$; the function need not be
+given by one quadratic expression on $K_i\cup K_j$. Two such cells can touch
+along more than one $(d-1)$-dimensional interface, or facet. The set
+$\mathcal F_{ij}$ records these connected faces separately so that the normal
+and the Tanaka condition can be specified on each one.
+\end{sidenote}
+
+For each $F\in\mathcal F_{ij}$, choose a unit normal
+$n_{i\to j,F}$ pointing from $K_i$ into $K_j$. If
+\[
+  F\subseteq \{x:h_F^\top x=\gamma_F\},
+\]
+then one may take
+\[
+  n_{i\to j,F}
+  =
+  \operatorname{sign}\!\left(h_F^\top(x_j-x_i)\right)
+  \frac{h_F}{\|h_F\|},
+\]
+where $x_i\in\operatorname{int}(K_i)$ and
+$x_j\in\operatorname{int}(K_j)$.
 
 The multidimensional Itô--Tanaka formula gives
 \begin{align}
@@ -111,15 +142,16 @@ V(X_0)
 &+
 \frac{1}{2}
 \sum_{i<j}
+\sum_{F\in\mathcal F_{ij}}
 \int_0^{t \wedge \tau_K}
 \left(
 \nabla V_j(X_s) - \nabla V_i(X_s)
-\right)\cdot n_{ij}
-dL_s^{F_{ij}} .
+\right)\cdot n_{i\to j,F}\,
+dL_s^F .
 \end{align}
 
-Here $L_t^{F_{ij}}$ denotes the surface local time accumulated by $X_t$ on the
-interface $F_{ij}$.
+Here $L_t^F$ denotes the surface local time accumulated by $X_t$ on the face
+$F$.
 
 We will focus on these terms:
 
@@ -148,11 +180,12 @@ the diffusion term.
     =
     \frac{1}{2}
     \sum_{i<j}
+    \sum_{F\in\mathcal F_{ij}}
     \int_0^{t \wedge \tau_K}
     \left(
         \nabla V_j(X_s) - \nabla V_i(X_s)
-    \right)\cdot n_{ij}
-    dL_s^{F_{ij}},
+    \right)\cdot n_{i\to j,F}\,
+    dL_s^F,
 \]
 the interface term.
 \end{enumerate}
@@ -241,17 +274,14 @@ piecewise linear. Therefore, on a compact set $K$, $\nabla V$ is bounded.
 Thus this condition is usually easy to verify if $\sigma$ is bounded on $K$.
 
 \item
-The interface contribution is nonpositive. For every shared face
-\[
-    F_{ij} = K_i \cap K_j,
-\]
-we assume
+The interface contribution is nonpositive. The Tanaka interface condition is
+imposed face by face: for every $F\in\mathcal F_{ij}$, we assume
 \[
     \left(
         \nabla V_j(x) - \nabla V_i(x)
-    \right)\cdot n_{ij}
+    \right)\cdot n_{i\to j,F}
     \leq 0,
-    \qquad x \in F_{ij}.
+    \qquad x \in F.
 \]
 Since
 \[
@@ -265,9 +295,10 @@ this condition can be written explicitly as
 \[
     \left(
         p_j - p_i + (Q_j - Q_i)x
-    \right)\cdot n_{ij}
+    \right)\cdot n_{i\to j,F}
     \leq 0,
-    \qquad x \in F_{ij}.
+    \qquad x \in F,
+    \qquad F\in\mathcal F_{ij}.
 \]
 
 This is the multidimensional version of the concavity condition
@@ -281,11 +312,12 @@ If
 \[
     \left(
         \nabla V_j(x) - \nabla V_i(x)
-    \right)\cdot n_{ij}
+    \right)\cdot n_{i\to j,F}
     \leq 0
-    \qquad \text{on } F_{ij},
+    \qquad \text{on } F,
 \]
-and $L_t^{F_{ij}}$ is nondecreasing in $t$, then the interface term $K_t$ is
+for every $F\in\mathcal F_{ij}$, and $L_t^F$ is nondecreasing in $t$, then the
+interface term $K_t$ is
 a supermartingale.
 
 \textbf{Proof:} We want to prove
@@ -299,26 +331,28 @@ The interface term is
     =
     \frac{1}{2}
     \sum_{i<j}
+    \sum_{F\in\mathcal F_{ij}}
     \int_0^{t \wedge \tau_K}
-    \gamma_{ij}(X_s)dL_s^{F_{ij}},
+    \gamma_{ij,F}(X_s)dL_s^F,
 \]
 where
 \[
-    \gamma_{ij}(x)
+    \gamma_{ij,F}(x)
     =
     \left(
         \nabla V_j(x) - \nabla V_i(x)
-    \right)\cdot n_{ij}.
+    \right)\cdot n_{i\to j,F}.
 \]
 By assumption,
 \[
-    \gamma_{ij}(x) \leq 0
-    \qquad x \in F_{ij}.
+    \gamma_{ij,F}(x) \leq 0
+    \qquad x \in F,
+    \qquad F\in\mathcal F_{ij}.
 \]
-Also, $dL_s^{F_{ij}}$ is a nonnegative measure, because surface local time is
+Also, $dL_s^F$ is a nonnegative measure, because surface local time is
 nondecreasing. Therefore
 \[
-    \int_r^t \gamma_{ij}(X_s)dL_s^{F_{ij}} \leq 0.
+    \int_r^t \gamma_{ij,F}(X_s)dL_s^F \leq 0.
 \]
 Hence the future increment of $K_t$ after time $r$ is nonpositive, and so
 \[
@@ -368,9 +402,10 @@ condition:
 \[
 \left(
 \nabla V_j(x) - \nabla V_i(x)
-\right)\cdot n_{ij}
+\right)\cdot n_{i\to j,F}
 \leq 0,
-\qquad x \in F_{ij}.
+\qquad x \in F,
+\qquad F\in\mathcal F_{ij}.
 \]
 
 Therefore $D_t + K_t$ is a supermartingale, and $M_t$ is a martingale. Since the
@@ -386,27 +421,28 @@ The condition
 \[
 \left(
 \nabla V_j(x) - \nabla V_i(x)
-\right)\cdot n_{ij}
+\right)\cdot n_{i\to j,F}
 \leq 0,
-\qquad x \in F_{ij},
+\qquad x \in F,
+\qquad F\in\mathcal F_{ij},
 \]
 says that when the process crosses from cell $K_i$ into cell $K_j$, the
 directional derivative of $V$ in the crossing direction cannot increase.
 
 Indeed, the normal derivative from the $K_i$ side is
 \[
-\nabla V_i(x)\cdot n_{ij},
+\nabla V_i(x)\cdot n_{i\to j,F},
 \]
 while the normal derivative from the $K_j$ side is
 \[
-\nabla V_j(x)\cdot n_{ij}.
+\nabla V_j(x)\cdot n_{i\to j,F}.
 \]
 
 Thus the condition is equivalent to
 \[
-\nabla V_j(x)\cdot n_{ij}
+\nabla V_j(x)\cdot n_{i\to j,F}
 \leq
-\nabla V_i(x)\cdot n_{ij}.
+\nabla V_i(x)\cdot n_{i\to j,F}.
 \]
 
 This is exactly the analogue of the one-dimensional condition
@@ -456,9 +492,10 @@ c_i + p_i^\top x + \frac{1}{2}x^\top Q_i x,
 \[
     \left(
         p_j - p_i + (Q_j - Q_i)x
-    \right)\cdot n_{ij}
+    \right)\cdot n_{i\to j,F}
     \leq 0,
-    \qquad x \in F_{ij}.
+    \qquad x \in F,
+    \qquad F\in\mathcal F_{ij}.
 \]
 \end{enumerate}
 
