@@ -1,0 +1,640 @@
+\section{Piecewise quadratic supermartingales in multiple dimensions}
+
+Now we will finally consider a very general setup. 
+
+First, we prove that when a piecewise-quadratic function $V : \mathbb{R}^d \to \mathbb{R}$ 
+satisfies similar concativity and smoothness conditions as in the one-dimensional case, then $V(X_t)$ is a supermartingale.
+
+Second, we will prove that if a smooth certificate exists, then we can construct a piecewise quadratic certificate that is a supermartingale,
+essentially showing how quadratic certificates are in some sense sufficient, while piecewise linear certificates are not.
+
+\subsection{Proving the supermartingale property}
+
+We will show that a piecewise quadratic function gives a supermartingale if:
+\begin{enumerate}
+\item the generator is nonpositive inside each region,
+\item the stochastic integral is a martingale,
+\item the normal derivative jumps in the correct direction across each
+interface.
+\end{enumerate}
+
+\begin{setup}
+Let:
+\begin{enumerate}
+\item $dX_t = f(X_t)dt + \sigma(X_t)dW_t$ be a $d$-dimensional SDE, where
+$f:\mathbb{R}^d \to \mathbb{R}^d$ and
+$\sigma:\mathbb{R}^d \to \mathbb{R}^{d \times m}$.
+\item $W_t$ is an $m$-dimensional Brownian motion.
+\item $a(x) = \sigma(x)\sigma(x)^\top$.
+\item $K \subseteq \mathbb{R}^d$ is a compact set partitioned into finitely
+many polyhedral cells:
+\[
+K = \bigcup_{i=1}^N K_i.
+\]
+\item $V:K \to \mathbb{R}$ is a continuous piecewise quadratic function such
+that
+\[
+V(x) = V_i(x)
+=
+c_i + p_i^\top x + \frac{1}{2}x^\top Q_i x,
+\qquad x \in K_i,
+\]
+where $Q_i = Q_i^\top$.
+\item $V$ is continuous across interfaces:
+\[
+V_i(x) = V_j(x),
+\qquad x \in K_i \cap K_j.
+\]
+\end{enumerate}
+\end{setup}
+
+Now we will consider what conditions on $V$ are sufficient to guarantee that
+$V(X_t)$ is a supermartingale, at least up to the first exit time from $K$.
+
+Define the stopping time
+\[
+\tau_K = \inf\{t \geq 0 : X_t \notin K\}.
+\]
+
+\begin{hypothesis}
+Does a multidimensional analogue of concavity, together with an interior
+generator condition, guarantee that
+\[
+V(X_{t \wedge \tau_K})
+\]
+is a supermartingale?
+\end{hypothesis}
+
+To answer this, we apply the multidimensional Itô--Tanaka formula to
+$V(X_{t \wedge \tau_K})$.
+
+On each cell $K_i$, we have
+\[
+\nabla V_i(x) = p_i + Q_i x,
+\qquad
+\nabla^2 V_i(x) = Q_i.
+\]
+
+Therefore, the infinitesimal generator of $V_i$ is
+\[
+\mathcal{L}V_i(x)
+=
+\nabla V_i(x) \cdot f(x)
++
+\frac{1}{2}
+\operatorname{tr}\!\left(a(x)\nabla^2 V_i(x)\right).
+\]
+
+Substituting the quadratic form gives
+\[
+\mathcal{L}V_i(x)
+=
+(p_i + Q_i x)\cdot f(x)
++
+\frac{1}{2}\operatorname{tr}\!\left(a(x)Q_i\right).
+\]
+
+Now let $F_{ij} = K_i \cap K_j$ be a shared interface between two neighbouring
+cells. Let $n_{ij}$ be the unit normal vector pointing from $K_i$ into $K_j$.
+
+The multidimensional Itô--Tanaka formula gives
+\begin{align}
+V(X_{t \wedge \tau_K})
+=
+V(X_0)
+&+
+\int_0^{t \wedge \tau_K}
+\mathcal{L}V(X_s) ds \\
+&+
+\int_0^{t \wedge \tau_K}
+\nabla V(X_s)^\top \sigma(X_s) dW_s \\
+&+
+\frac{1}{2}
+\sum_{i<j}
+\int_0^{t \wedge \tau_K}
+\left(
+\nabla V_j(X_s) - \nabla V_i(X_s)
+\right)\cdot n_{ij}
+dL_s^{F_{ij}} .
+\end{align}
+
+Here $L_t^{F_{ij}}$ denotes the surface local time accumulated by $X_t$ on the
+interface $F_{ij}$.
+
+We will focus on these terms:
+
+\begin{enumerate}
+\item
+\[
+D_t
+=
+\int_0^{t \wedge \tau_K}
+\mathcal{L}V(X_s)ds,
+\]
+the interior drift term.
+
+\item
+\[
+    M_t
+    =
+    \int_0^{t \wedge \tau_K}
+    \nabla V(X_s)^\top \sigma(X_s)dW_s,
+\]
+the diffusion term.
+
+\item
+\[
+    K_t
+    =
+    \frac{1}{2}
+    \sum_{i<j}
+    \int_0^{t \wedge \tau_K}
+    \left(
+        \nabla V_j(X_s) - \nabla V_i(X_s)
+    \right)\cdot n_{ij}
+    dL_s^{F_{ij}},
+\]
+the interface term.
+\end{enumerate}
+
+We need to prove that
+\[
+D_t + M_t + K_t
+\]
+is a supermartingale.
+
+Some natural assumptions, which are sufficient to guarantee that
+$V(X_{t \wedge \tau_K})$ is a supermartingale, are the following.
+
+\begin{enumerate}
+\item
+The interior generator is nonpositive on every cell:
+\[
+\mathcal{L}V_i(x) \leq 0,
+\qquad x \in \operatorname{int}(K_i).
+\]
+Equivalently,
+\[
+(p_i + Q_i x)\cdot f(x)
++
+\frac{1}{2}\operatorname{tr}\!\left(a(x)Q_i\right)
+\leq 0,
+\qquad x \in \operatorname{int}(K_i).
+\]
+
+This is the multidimensional analogue of the condition
+\[
+    f(x)V'(x) \leq 0
+\]
+from the one-dimensional piecewise linear case.
+
+\begin{fact}
+If $\mathcal{L}V(X_s) \leq 0$ for all $s \leq \tau_K$, then the drift term
+$D_t$ is a supermartingale.
+
+\textbf{Proof:} We want to prove
+\[
+    \mathbb{E}[D_t \mid \mathcal{F}_r] \leq D_r,
+    \qquad r \leq t.
+\]
+By definition,
+\begin{align}
+    \mathbb{E}[D_t \mid \mathcal{F}_r]
+    &=
+    \mathbb{E}\left[
+    \int_0^{t \wedge \tau_K}
+    \mathcal{L}V(X_s)ds
+    \Bigm| \mathcal{F}_r
+    \right] \\
+    &=
+    \int_0^{r \wedge \tau_K}
+    \mathcal{L}V(X_s)ds
+    +
+    \mathbb{E}\left[
+    \int_{r \wedge \tau_K}^{t \wedge \tau_K}
+    \mathcal{L}V(X_s)ds
+    \Bigm| \mathcal{F}_r
+    \right].
+\end{align}
+Since $\mathcal{L}V(X_s) \leq 0$, the second term is nonpositive. Hence
+\[
+    \mathbb{E}[D_t \mid \mathcal{F}_r]
+    \leq
+    D_r.
+\]
+Therefore $D_t$ is a supermartingale.
+\end{fact}
+
+\item
+The stochastic integral $M_t$ is a martingale. A sufficient condition is
+\[
+    \mathbb{E}\left[
+    \int_0^{t \wedge \tau_K}
+    \left\|
+        \nabla V(X_s)^\top \sigma(X_s)
+    \right\|^2 ds
+    \right]
+    < \infty.
+\]
+Since $V$ is piecewise quadratic on finitely many cells, $\nabla V$ is
+piecewise linear. Therefore, on a compact set $K$, $\nabla V$ is bounded.
+Thus this condition is usually easy to verify if $\sigma$ is bounded on $K$.
+
+\item
+The interface contribution is nonpositive. For every shared face
+\[
+    F_{ij} = K_i \cap K_j,
+\]
+we assume
+\[
+    \left(
+        \nabla V_j(x) - \nabla V_i(x)
+    \right)\cdot n_{ij}
+    \leq 0,
+    \qquad x \in F_{ij}.
+\]
+Since
+\[
+    \nabla V_i(x) = p_i + Q_i x
+\]
+and
+\[
+    \nabla V_j(x) = p_j + Q_j x,
+\]
+this condition can be written explicitly as
+\[
+    \left(
+        p_j - p_i + (Q_j - Q_i)x
+    \right)\cdot n_{ij}
+    \leq 0,
+    \qquad x \in F_{ij}.
+\]
+
+This is the multidimensional version of the concavity condition
+\[
+    V'_+(x_i) - V'_-(x_i) \leq 0
+\]
+from the one-dimensional case.
+
+\begin{fact}
+If
+\[
+    \left(
+        \nabla V_j(x) - \nabla V_i(x)
+    \right)\cdot n_{ij}
+    \leq 0
+    \qquad \text{on } F_{ij},
+\]
+and $L_t^{F_{ij}}$ is nondecreasing in $t$, then the interface term $K_t$ is
+a supermartingale.
+
+\textbf{Proof:} We want to prove
+\[
+    \mathbb{E}[K_t \mid \mathcal{F}_r] \leq K_r,
+    \qquad r \leq t.
+\]
+The interface term is
+\[
+    K_t
+    =
+    \frac{1}{2}
+    \sum_{i<j}
+    \int_0^{t \wedge \tau_K}
+    \gamma_{ij}(X_s)dL_s^{F_{ij}},
+\]
+where
+\[
+    \gamma_{ij}(x)
+    =
+    \left(
+        \nabla V_j(x) - \nabla V_i(x)
+    \right)\cdot n_{ij}.
+\]
+By assumption,
+\[
+    \gamma_{ij}(x) \leq 0
+    \qquad x \in F_{ij}.
+\]
+Also, $dL_s^{F_{ij}}$ is a nonnegative measure, because surface local time is
+nondecreasing. Therefore
+\[
+    \int_r^t \gamma_{ij}(X_s)dL_s^{F_{ij}} \leq 0.
+\]
+Hence the future increment of $K_t$ after time $r$ is nonpositive, and so
+\[
+    \mathbb{E}[K_t \mid \mathcal{F}_r] \leq K_r.
+\]
+Therefore $K_t$ is a supermartingale.
+\end{fact}
+\end{enumerate}
+
+\subsubsection{Proof of the supermartingale property}
+
+We now combine the three conditions.
+
+By the multidimensional Itô--Tanaka formula,
+\begin{align}
+V(X_{t \wedge \tau_K})
+=
+V(X_0)
++
+D_t
++
+M_t
++
+K_t.
+\end{align}
+
+The drift term $D_t$ is a supermartingale by the interior generator condition:
+\[
+\mathcal{L}V_i(x) \leq 0
+\qquad x \in \operatorname{int}(K_i).
+\]
+
+The stochastic integral $M_t$ is a martingale by the square-integrability
+assumption:
+\[
+\mathbb{E}\left[
+\int_0^{t \wedge \tau_K}
+\left|
+\nabla V(X_s)^\top \sigma(X_s)
+\right|^2 ds
+\right]
+< \infty.
+\]
+
+The interface term $K_t$ is a supermartingale by the multidimensional concavity
+condition:
+\[
+\left(
+\nabla V_j(x) - \nabla V_i(x)
+\right)\cdot n_{ij}
+\leq 0,
+\qquad x \in F_{ij}.
+\]
+
+Therefore $D_t + K_t$ is a supermartingale, and $M_t$ is a martingale. Since the
+sum of a martingale and a supermartingale is a supermartingale, we conclude that
+\[
+V(X_{t \wedge \tau_K})
+\]
+is a supermartingale.
+
+\subsubsection{Interpretation of the multidimensional concavity condition}
+
+The condition
+\[
+\left(
+\nabla V_j(x) - \nabla V_i(x)
+\right)\cdot n_{ij}
+\leq 0,
+\qquad x \in F_{ij},
+\]
+says that when the process crosses from cell $K_i$ into cell $K_j$, the
+directional derivative of $V$ in the crossing direction cannot increase.
+
+Indeed, the normal derivative from the $K_i$ side is
+\[
+\nabla V_i(x)\cdot n_{ij},
+\]
+while the normal derivative from the $K_j$ side is
+\[
+\nabla V_j(x)\cdot n_{ij}.
+\]
+
+Thus the condition is equivalent to
+\[
+\nabla V_j(x)\cdot n_{ij}
+\leq
+\nabla V_i(x)\cdot n_{ij}.
+\]
+
+This is exactly the analogue of the one-dimensional condition
+\[
+V'_+(x_i) \leq V'_-(x_i).
+\]
+
+So, in multiple dimensions, ordinary concavity is not the only thing we need to
+look at. What matters for the local time term is the jump in the normal
+derivative across each interface. If that jump is nonpositive, then the surface
+local time contribution pushes $V(X_t)$ downwards rather than upwards.
+
+\subsubsection{Summary of sufficient conditions}
+
+We have shown that the following assumptions are sufficient.
+
+\begin{enumerate}
+\item $V$ is continuous and piecewise quadratic:
+\[
+V(x)
+=
+c_i + p_i^\top x + \frac{1}{2}x^\top Q_i x,
+\qquad x \in K_i.
+\]
+
+\item The generator is nonpositive inside each cell:
+\[
+    (p_i + Q_i x)\cdot f(x)
+    +
+    \frac{1}{2}\operatorname{tr}\!\left(a(x)Q_i\right)
+    \leq 0,
+    \qquad x \in \operatorname{int}(K_i).
+\]
+
+\item The stochastic integral is a martingale:
+\[
+    \mathbb{E}\left[
+    \int_0^{t \wedge \tau_K}
+    \left\|
+        \nabla V(X_s)^\top \sigma(X_s)
+    \right\|^2 ds
+    \right]
+    < \infty.
+\]
+
+\item The interface condition holds on every shared face:
+\[
+    \left(
+        p_j - p_i + (Q_j - Q_i)x
+    \right)\cdot n_{ij}
+    \leq 0,
+    \qquad x \in F_{ij}.
+\]
+\end{enumerate}
+
+Under these assumptions,
+\[
+V(X_{t \wedge \tau_K})
+\]
+is a supermartingale.
+
+This gives the multidimensional version of the one-dimensional piecewise linear
+certificate result. The interior generator condition controls the ordinary Itô
+drift, while the interface concavity condition controls the Tanaka local time
+terms.
+
+\subsection{Asymptotic completeness of piecewise quadratic certificates}
+
+\paragraph{Theorem (asymptotic completeness under a strict smooth certificate).}
+Let \(K\subset\mathbb R^2\) be compact and polygonal, and consider the stopped
+SDE
+\[
+  dX_t=f(X_t)\,dt+\sigma(X_t)\,dW_t,
+  \qquad
+  a(x)=\sigma(x)\sigma(x)^\top,
+\]
+stopped at
+\[
+  \tau_K=\inf\{t\ge0:X_t\notin K\}.
+\]
+Assume that \(f\) and \(a\) are bounded on \(K\).  Suppose there exists a
+strict smooth certificate \(U\in C^3(K)\) such that
+\[
+  \mathcal LU(x)
+  =
+  \nabla U(x)\cdot f(x)
+  +
+  \frac12\operatorname{tr}\!\bigl(a(x)\nabla^2U(x)\bigr)
+  \le -\varepsilon
+  \qquad x\in K,
+\]
+for some \(\varepsilon>0\).  Assume also that the boundary/separation
+conditions hold with margin: for some \(\delta>0\),
+\[
+  \sup_{x\in X_0}U(x)\le \alpha-\delta,
+  \qquad
+  \inf_{x\in X_u}U(x)\ge \beta+\delta,
+  \qquad
+  \alpha<\beta.
+\]
+
+Let \(\{\mathcal T_h\}_{h\downarrow0}\) be a shape-regular sequence of
+refined triangulations of \(K\) supporting \(C^1\) piecewise-quadratic spline
+interpolants \(I_hU\) satisfying
+\[
+  \|I_hU-U\|_{C^2(K)}\to0
+  \qquad\text{as }h\to0.
+\]
+Then, for all sufficiently small \(h\), the function
+\[
+  V_h:=I_hU
+\]
+is a continuous \(C^1\) piecewise-quadratic certificate satisfying
+\[
+  \mathcal LV_h(x)\le -\frac{\varepsilon}{2}
+  \qquad x\in K,
+\]
+and
+\[
+  \sup_{x\in X_0}V_h(x)\le \alpha,
+  \qquad
+  \inf_{x\in X_u}V_h(x)\ge \beta.
+\]
+Consequently,
+\[
+  V_h(X_{t\wedge\tau_K})
+\]
+is a supermartingale.
+
+\paragraph{Proof.}
+Since \(f\) and \(a\) are bounded on \(K\), define
+\[
+  F:=\sup_{x\in K}\|f(x)\|,
+  \qquad
+  A:=\sup_{x\in K}\|a(x)\|.
+\]
+Let
+\[
+  E_h:=V_h-U.
+\]
+Then
+\[
+  \mathcal LV_h-\mathcal LU
+  =
+  \nabla E_h\cdot f
+  +
+  \frac12\operatorname{tr}\!\bigl(a\nabla^2E_h\bigr).
+\]
+Hence, for a constant \(C_K>0\) depending only on the dimension and the chosen
+matrix norm,
+\[
+  |\mathcal LV_h(x)-\mathcal LU(x)|
+  \le
+  F\|\nabla E_h\|_{L^\infty(K)}
+  +
+  C_K A\|\nabla^2E_h\|_{L^\infty(K)}.
+\]
+Because
+\[
+  \|E_h\|_{C^2(K)}\to0,
+\]
+there exists \(h_0>0\) such that, for all \(h<h_0\),
+\[
+  |\mathcal LV_h(x)-\mathcal LU(x)|
+  \le \frac{\varepsilon}{2}
+  \qquad x\in K.
+\]
+Since \(\mathcal LU\le-\varepsilon\), it follows that
+\[
+  \mathcal LV_h
+  \le
+  -\varepsilon+\frac{\varepsilon}{2}
+  =
+  -\frac{\varepsilon}{2}.
+\]
+
+Similarly, since \(V_h\to U\) uniformly, for all sufficiently small \(h\),
+\[
+  \|V_h-U\|_{L^\infty(K)}\le\delta.
+\]
+Therefore
+\[
+  \sup_{X_0}V_h
+  \le
+  \sup_{X_0}U+\delta
+  \le
+  \alpha,
+\]
+and
+\[
+  \inf_{X_u}V_h
+  \ge
+  \inf_{X_u}U-\delta
+  \ge
+  \beta.
+\]
+
+It remains to check the nonsmooth interfaces.  The spline \(V_h\) is
+\(C^1\) across every internal face of the triangulation.  Therefore, if two
+quadratic pieces \(V_i,V_j\) meet across a face \(F_{ij}\), then
+\[
+  \nabla V_i(x)=\nabla V_j(x)
+  \qquad x\in F_{ij}.
+\]
+Hence the Tanaka normal-derivative jump is
+\[
+  \bigl[\nabla V_j(x)-\nabla V_i(x)\bigr]\cdot n_{i\to j}=0,
+\]
+so every local-time contribution is zero.
+
+Applying the multidimensional It\^o--Tanaka formula gives
+\[
+  V_h(X_{t\wedge\tau_K})
+  =
+  V_h(X_0)
+  +
+  \int_0^{t\wedge\tau_K}\mathcal LV_h(X_s)\,ds
+  +
+  \int_0^{t\wedge\tau_K}\nabla V_h(X_s)\sigma(X_s)\,dW_s.
+\]
+The drift term is nonpositive because
+\[
+  \mathcal LV_h\le-\frac{\varepsilon}{2}<0.
+\]
+The stochastic integral is a true martingale after stopping, since \(K\) is
+compact and \(V_h,\sigma\) are bounded on \(K\).  Therefore
+\[
+  V_h(X_{t\wedge\tau_K})
+\]
+is a martingale plus a nonincreasing finite-variation process, and is hence a
+supermartingale. \(\square\)
