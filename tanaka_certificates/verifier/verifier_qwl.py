@@ -64,10 +64,11 @@ class VerifierPiecewiseQuadratic(Verifier):
     def __init__(
         self,
         sde: SDE,
-        certificate: Certificate,
         reach_avoid_problem: ReachAvoidProblem,
-        piecewise_lookup: PiecewiseQuadraticLookupBaseline,
+        piecewise_lookup: PiecewiseQuadraticLookupBaseline | None = None,
+        certificate: Certificate | None = None,
     ):
+
         super().__init__(sde, certificate, reach_avoid_problem)
         self.piecewise_lookup = piecewise_lookup
 

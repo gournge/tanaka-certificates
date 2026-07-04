@@ -4,6 +4,8 @@ from itertools import product
 import numpy as np
 from scipy.optimize import linprog
 
+from tanaka_certificates.nn.last_layer_activation import PiecewiseQuadratic1D
+
 
 @dataclass
 class Cell:
@@ -31,37 +33,6 @@ class Cell:
         if point.shape != (self.Q.shape[0],):
             return False
         return bool(np.all(self.A @ point <= self.b + atol))
-
-
-@dataclass
-class PiecewiseQuadratic1D:
-    """
-
-    A piecewise quadratic function in 1D.
-    Different pieces can be linear
-
-    Example:
-        V(x) = 3x^2 + 2x + 1, for x in [-1, 0]
-        V(x) = 2x^2 + 3x + 4, for x in [0, 1]
-    Or:
-
-        V(x) = 0 for x <= -1
-        V(x) = (x+1)^2 / 4 for -1 < x < 1
-        V(x) = x for x >= 1
-
-    (this resembles a ReLU)
-
-    Attributes:
-        intervals: The intervals on which the pieces are defined.
-        Qs: The quadratic coefficients of the pieces.
-        ps: The linear coefficients of the pieces.
-        cs: The constant coefficients of the pieces.
-    """
-
-    intervals: list[tuple[float, float]]
-    Qs: list[float]
-    ps: list[float]
-    cs: list[float]
 
 
 def discover_cells_from_network_weights(
@@ -167,7 +138,9 @@ def discover_cells_from_network_weights(
                 if np.isfinite(upper):
                     extra_H.append(-output_affine)
                     extra_h.append(upper - output_offset)
-                cell_H = np.vstack((region_H, np.asarray(extra_H))) if extra_H else region_H
+                cell_H = (
+                    np.vstack((region_H, np.asarray(extra_H))) if extra_H else region_H
+                )
                 cell_h = np.concatenate((region_h, extra_h)) if extra_h else region_h
                 if not _has_full_dimensional_interior(cell_H, cell_h):
                     continue

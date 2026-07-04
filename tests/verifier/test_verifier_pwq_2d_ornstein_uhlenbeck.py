@@ -2,8 +2,6 @@ from unittest.mock import Mock
 
 import numpy as np
 
-from tanaka_certificates.facet import Breakpoint
-from tanaka_certificates.nn import create_multidim_certificate
 from tanaka_certificates.ra import ReachAvoidProblem
 from tanaka_certificates.regions import create_hyperrectangle, HyperrectangleUnion
 from tanaka_certificates.sde import IsotropicOrnsteinUhlenbeck
@@ -26,15 +24,6 @@ def make_ornstein_uhlenbeck_verifier(
 ):
     return VerifierPiecewiseQuadratic(
         sde=IsotropicOrnsteinUhlenbeck(2, volatility=0.5),
-        certificate=create_multidim_certificate(
-            [
-                Breakpoint(np.array([-0.5]), np.array([0.5])),
-                Breakpoint(np.array([0.0]), np.array([0.25])),
-                Breakpoint(np.array([0.5]), np.array([0.5])),
-            ],
-            -1.0,
-            1.0,
-        ),
         reach_avoid_problem=ReachAvoidProblem(
             domain=create_hyperrectangle([-1.0, -1.25], [1.25, 0.75]),
             initial=create_hyperrectangle(start - start_delta, start + start_delta),
