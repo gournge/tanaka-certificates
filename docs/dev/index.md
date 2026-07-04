@@ -7,6 +7,8 @@ stochastic differential equations and piecewise-linear Tanaka certificates.
   the verifier.
 - [Key abstractions](abstractions.md) explains how the main objects fit
   together and records the verifier's current support boundary.
+- [Cell discovery](cell_discovery.md) explains how ReLU activation regions and
+  a scalar piecewise-quadratic top are converted into explicit quadratic cells.
 
 From the repository root, install the development environment and run the test
 suite with:
