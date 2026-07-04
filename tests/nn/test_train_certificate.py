@@ -1,12 +1,12 @@
+import numpy as np
 import torch
 
 from tanaka_certificates.nn.train_certificate import (
     TrainingCertificateConfiguration,
+    _region_corners,
     train_pwq_certificate_baseline,
 )
-from tanaka_certificates.piecewise_lookup.cell_discovery import (
-    discover_cells_from_network_weights,
-)
+from tanaka_certificates.piecewise_lookup import PiecewiseQuadraticLookupBaseline
 from tanaka_certificates.ra import ReachAvoidProblem
 from tanaka_certificates.regions import HyperrectangleUnion, create_hyperrectangle
 from tanaka_certificates.sde import IsotropicOrnsteinUhlenbeck
@@ -40,11 +40,12 @@ def test_training_baseline_returns_cell_discoverable_certificate():
     output = certificate(torch.zeros((4, 2)))
     assert output.shape == (4, 1)
     assert torch.isfinite(output).all()
+    domain_points = torch.rand((256, 2)) * 2.0 - 1.0
+    assert torch.all(certificate(domain_points) >= -1e-6)
+    assert len(certificate) == 6
+    assert not certificate.final_linear_has_relu()
     assert len(certificate.training_artifact.network_over_time) == 2
-    assert discover_cells_from_network_weights(
-        certificate.get_relu_network_weights(),
-        certificate.get_last_layer_piecewise_quadratic_activation(),
-    )
+    assert PiecewiseQuadraticLookupBaseline(certificate, sde).get_cells()
 
 
 def test_training_is_reproducible_from_configuration_seed():
@@ -57,3 +58,23 @@ def test_training_is_reproducible_from_configuration_seed():
 
     for left, right in zip(first.parameters(), second.parameters()):
         torch.testing.assert_close(left, right)
+
+
+def test_region_corners_include_every_union_rectangle_corner():
+    region = _problem().unsafe
+    corners = _region_corners(region).numpy()
+
+    expected = {
+        tuple(point)
+        for rectangle in region
+        for point in (
+            (rectangle.lower[0], rectangle.lower[1]),
+            (rectangle.lower[0], rectangle.upper[1]),
+            (rectangle.upper[0], rectangle.lower[1]),
+            (rectangle.upper[0], rectangle.upper[1]),
+        )
+    }
+    expected_at_training_dtype = {
+        tuple(np.asarray(point, dtype=corners.dtype)) for point in expected
+    }
+    assert {tuple(point) for point in corners} == expected_at_training_dtype

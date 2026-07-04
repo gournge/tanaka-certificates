@@ -34,4 +34,13 @@ class PiecewiseQuadraticLookupBaseline(PiecewiseQuadraticLookup):
         return discover_cells_from_network_weights(
             self.certificate.get_relu_network_weights(),
             self.certificate.get_last_layer_piecewise_quadratic_activation(),
+            final_linear_has_relu=self.certificate.final_linear_has_relu(),
         )
+
+    def check_smaller_on_hyperrectangle_union(self, hyperrectangle_union, alpha):
+        raise NotImplementedError("use VerifierPiecewiseQuadratic for regional checks")
+
+    def check_generator_nonpos_intersection_cell_interior_subbeta_basin(
+        self, target, epsilon
+    ):
+        raise NotImplementedError("use VerifierPiecewiseQuadratic for generator checks")

@@ -1,6 +1,4 @@
 from dataclasses import dataclass
-from itertools import product
-
 import numpy as np
 from scipy.optimize import linprog
 
@@ -38,6 +36,8 @@ class Cell:
 def discover_cells_from_network_weights(
     relu_network_weights: list[tuple[np.ndarray, np.ndarray]],
     last_layer_piecewise_quadratic_activation: PiecewiseQuadratic1D,
+    *,
+    final_linear_has_relu: bool = True,
 ) -> list[Cell]:
     """Discover the cells K_i from the weights of the ReLU network and the last layer.
 
@@ -71,32 +71,57 @@ def discover_cells_from_network_weights(
     ]
     tolerance = 1e-10
 
-    for weight, bias in weights:
+    for layer_index, (weight, bias) in enumerate(weights):
         next_states = []
         for affine, offset, region_H, region_h in states:
             preactivation_affine = weight @ affine
             preactivation_offset = weight @ offset + bias
+            if layer_index == len(weights) - 1 and not final_linear_has_relu:
+                next_states.append(
+                    (
+                        preactivation_affine,
+                        preactivation_offset,
+                        region_H,
+                        region_h,
+                    )
+                )
+                continue
             forced_inactive = (
                 np.linalg.norm(preactivation_affine, axis=1) <= tolerance
             ) & (np.abs(preactivation_offset) <= tolerance)
 
-            for pattern in product((False, True), repeat=len(bias)):
-                active = np.asarray(pattern, dtype=bool)
-                if np.any(active & forced_inactive):
-                    continue
+            # Split one neuron at a time and prune empty partial patterns
+            # immediately.  Enumerating product((False, True), repeat=width)
+            # performs 2**width LPs even though a width-w hyperplane
+            # arrangement in fixed input dimension has only polynomially many
+            # nonempty regions.
+            partial_patterns = [(region_H, region_h, [])]
+            for neuron in range(len(bias)):
+                next_patterns = []
+                for partial_H, partial_h, partial_active in partial_patterns:
+                    if forced_inactive[neuron]:
+                        next_patterns.append(
+                            (partial_H, partial_h, partial_active + [False])
+                        )
+                        continue
+                    for is_active in (False, True):
+                        sign = 1.0 if is_active else -1.0
+                        candidate_H = np.vstack(
+                            (partial_H, sign * preactivation_affine[neuron])
+                        )
+                        candidate_h = np.r_[
+                            partial_h, sign * preactivation_offset[neuron]
+                        ]
+                        if _has_full_dimensional_interior(candidate_H, candidate_h):
+                            next_patterns.append(
+                                (candidate_H, candidate_h, partial_active + [is_active])
+                            )
+                partial_patterns = next_patterns
+                if not partial_patterns:
+                    break
 
-                signs = np.where(active, 1.0, -1.0)
-                relevant = ~forced_inactive
-                candidate_H = np.vstack(
-                    (region_H, signs[relevant, None] * preactivation_affine[relevant])
-                )
-                candidate_h = np.concatenate(
-                    (region_h, signs[relevant] * preactivation_offset[relevant])
-                )
-                if not _has_full_dimensional_interior(candidate_H, candidate_h):
-                    continue
-
-                mask = active.astype(float)
+            for candidate_H, candidate_h, active in partial_patterns:
+                mask = np.asarray(active, dtype=float)
                 next_states.append(
                     (
                         mask[:, None] * preactivation_affine,

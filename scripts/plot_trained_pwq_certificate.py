@@ -17,15 +17,18 @@ from tanaka_certificates.nn.train_certificate import (
     TrainingCertificateConfiguration,
     train_pwq_certificate_baseline,
 )
-from tanaka_certificates.piecewise_lookup.cell_discovery import (
-    discover_cells_from_network_weights,
-)
 from tanaka_certificates.ra import ReachAvoidProblem
 from tanaka_certificates.regions import HyperrectangleUnion, create_hyperrectangle
 from tanaka_certificates.sde import EulerMaruyama, IsotropicOrnsteinUhlenbeck
+from tanaka_certificates.verifier import (
+    IssueKind,
+    QuadraticForm,
+    VerifierPiecewiseQuadratic,
+)
 
 
 DEFAULT_OUTPUT = Path("output")
+DEFAULT_ALPHA_GRID = (0.5, 0.75, 1.0, 1.25, 1.5)
 REGION_STYLE = {
     "initial": ("#f2b84b", "#9a6500", "Initial"),
     "target": ("#52a76b", "#236b38", "Target"),
@@ -33,7 +36,23 @@ REGION_STYLE = {
 }
 
 
-def make_ou_problem() -> tuple[IsotropicOrnsteinUhlenbeck, ReachAvoidProblem]:
+class _OUGeneratorBounder:
+    def __init__(self, sde):
+        self.sde = sde
+
+    def generator_on(self, cell):
+        rate = self.sde.mean_reversion
+        mean = np.full(self.sde.state_dim, self.sde.long_term_mean)
+        return QuadraticForm(
+            Q=-2.0 * rate * cell.Q,
+            p=2.0 * rate * cell.Q @ mean - rate * cell.p,
+            c=float(rate * cell.p @ mean + self.sde.volatility**2 * np.trace(cell.Q)),
+        )
+
+
+def make_ou_problem(
+    alpha: float = 0.5,
+) -> tuple[IsotropicOrnsteinUhlenbeck, ReachAvoidProblem]:
     """Return the OU reach-avoid problem used by the multidimensional test."""
     sde = IsotropicOrnsteinUhlenbeck(2, volatility=0.5)
     problem = ReachAvoidProblem(
@@ -44,11 +63,29 @@ def make_ou_problem() -> tuple[IsotropicOrnsteinUhlenbeck, ReachAvoidProblem]:
             create_hyperrectangle([0.8, -0.2], [1.2, 0.2]),
         ),
         target=create_hyperrectangle([-0.1, -0.1], [0.1, 0.1]),
-        alpha=0.5,
+        alpha=alpha,
         beta=2.0,
         epsilon=0.1,
     )
     return sde, problem
+
+
+def make_default_training_configuration(
+    *,
+    epochs: int = 400,
+    batch_size: int = 256,
+    hidden_width: int = 8,
+    seed: int = 2026,
+    record_network_weights_over_time: bool = True,
+) -> TrainingCertificateConfiguration:
+    """Single source of truth for plotting and OU training regressions."""
+    return TrainingCertificateConfiguration(
+        epochs=epochs,
+        batch_size=batch_size,
+        hidden_width=hidden_width,
+        torch_seed=seed,
+        record_network_weights_over_time=record_network_weights_over_time,
+    )
 
 
 def solve_ideal_committor(
@@ -204,7 +241,9 @@ def _region_points(region, resolution: int) -> np.ndarray:
     return np.concatenate(result)
 
 
-def _write_metrics_log(artifact, certificate, reference, problem, resolution=80):
+def _write_metrics_log(
+    artifact, certificate, reference, problem, issues, resolution=80
+):
     lines = [
         "Dense-grid certificate diagnostics (not formal verification)",
         f"grid resolution per rectangle: {resolution} x {resolution}",
@@ -212,6 +251,34 @@ def _write_metrics_log(artifact, certificate, reference, problem, resolution=80)
         f"required unsafe condition: inf V(unsafe) >= beta = {problem.beta:g}",
         "",
     ]
+    lines.append("[verifier diagnostics]")
+    if issues:
+        for issue in issues:
+            face = (
+                ""
+                if issue.face_segment is None
+                else f" face={[point.tolist() for point in issue.face_segment]}"
+            )
+            lines.append(
+                f"{issue.kind.value}: point={issue.point.tolist()} "
+                f"value={issue.value:.3g} bound={issue.bound:.3g} "
+                f"margin={issue.margin:.3g} cells={issue.cell_indices}{face}"
+            )
+    else:
+        lines.append("no sampled violations")
+    lines.append("")
+    training = certificate.training_artifact
+    lines.extend(
+        [
+            "[training]",
+            f"epochs completed: {training.epochs_completed}",
+            "final losses: "
+            + ", ".join(
+                f"{name}={value:.3g}" for name, value in training.final_losses.items()
+            ),
+            "",
+        ]
+    )
     trained_metrics = {}
     for certificate_name, evaluator in (
         ("trained PWQ", lambda points: _evaluate_certificate(certificate, points)),
@@ -227,8 +294,8 @@ def _write_metrics_log(artifact, certificate, reference, problem, resolution=80)
             values = evaluator(points)
             metrics[region_name] = (np.nanmin(values), np.nanmean(values), np.nanmax(values))
             lines.append(
-                f"{region_name:7s}: min={metrics[region_name][0]:.8f} "
-                f"avg={metrics[region_name][1]:.8f} max={metrics[region_name][2]:.8f}"
+                f"{region_name:7s}: min={metrics[region_name][0]:.3g} "
+                f"avg={metrics[region_name][1]:.3g} max={metrics[region_name][2]:.3g}"
             )
         if certificate_name == "trained PWQ":
             trained_metrics = metrics
@@ -307,18 +374,22 @@ def plot_trained_pwq_certificate(
     certificate = train_pwq_certificate_baseline(
         sde,
         problem,
-        training_configuration=TrainingCertificateConfiguration(
+        training_configuration=make_default_training_configuration(
             epochs=epochs,
             batch_size=batch_size,
             hidden_width=hidden_width,
-            torch_seed=seed,
+            seed=seed,
             record_network_weights_over_time=True,
         ),
     ).eval()
-    cells = discover_cells_from_network_weights(
-        certificate.get_relu_network_weights(),
-        certificate.get_last_layer_piecewise_quadratic_activation(),
+    verifier = VerifierPiecewiseQuadratic(
+        sde,
+        problem,
+        certificate,
+        generator_bounder=_OUGeneratorBounder(sde),
     )
+    verification_result = verifier.verify()
+    cells = verifier.cells
 
     x = np.linspace(problem.domain.lower[0], problem.domain.upper[0], resolution)
     y = np.linspace(problem.domain.lower[1], problem.domain.upper[1], resolution)
@@ -367,6 +438,41 @@ def plot_trained_pwq_certificate(
         else:
             map_axis.set_title("Smooth reference over trained-network cells")
         _add_regions(map_axis, problem, legend=row == 0)
+        region_legend = map_axis.get_legend()
+        if show_cells and verifier.issues:
+            issue_colors = {
+                IssueKind.INITIAL: "#ffb000",
+                IssueKind.UNSAFE: "#d62728",
+                IssueKind.GENERATOR: "#e83e8c",
+                IssueKind.CONCAVITY: "#00ffff",
+                IssueKind.CONTINUITY: "#7f00ff",
+            }
+            for issue in verifier.issues:
+                if issue.face_segment is not None:
+                    face = np.stack(issue.face_segment)
+                    map_axis.plot(
+                        face[:, 0],
+                        face[:, 1],
+                        color=issue_colors[issue.kind],
+                        linewidth=4.0,
+                        alpha=0.85,
+                        zorder=19,
+                    )
+                map_axis.scatter(
+                    *issue.point,
+                    marker="X",
+                    s=95,
+                    color=issue_colors[issue.kind],
+                    edgecolor="black",
+                    linewidth=0.8,
+                    zorder=20,
+                    label=f"Invalid: {issue.kind.value}",
+                )
+            handles, labels = map_axis.get_legend_handles_labels()
+            unique = dict(zip(labels, handles))
+            map_axis.legend(unique.values(), unique.keys(), fontsize=7, loc="lower left")
+            if region_legend is not None:
+                map_axis.add_artist(region_legend)
         map_axis.set(xlabel=r"$x_1$", ylabel=r"$x_2$", aspect="equal")
 
         path_axis = figure.add_subplot(grid[row, 2])
@@ -401,7 +507,11 @@ def plot_trained_pwq_certificate(
         path_axis.grid(alpha=0.2)
         path_axis.legend(fontsize=8)
 
-    figure.suptitle("2D Ornstein--Uhlenbeck reach-avoid certificates", fontsize=15)
+    figure.suptitle(
+        "2D Ornstein--Uhlenbeck reach-avoid certificates\n"
+        f"Numerical verifier: {verification_result.value}",
+        fontsize=15,
+    )
     figure.tight_layout()
     artifact = ResultArtifact.create("trained_pwq_certificate", output_root)
     figure.savefig(artifact.path("certificate_comparison.pdf"), bbox_inches="tight")
@@ -419,7 +529,7 @@ def plot_trained_pwq_certificate(
         animation_points,
         maximum_frames=animation_frames,
     )
-    _write_metrics_log(artifact, certificate, reference, problem)
+    _write_metrics_log(artifact, certificate, reference, problem, verifier.issues)
     torch.save(certificate.state_dict(), artifact.path("trained_certificate.pt"))
     plt.close(figure)
     return artifact

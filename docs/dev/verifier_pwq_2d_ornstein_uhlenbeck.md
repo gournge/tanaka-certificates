@@ -30,8 +30,9 @@ the distance to the origin need not capture this geometry.
 
 ## Certificate conditions
 
-The test uses the thresholds $\alpha=0.5$ and $\beta=2$, and asks for a
-generator decrease of $\epsilon$. A valid certificate $V$ must establish
+The test compares the strict level $\alpha=0.5$ with the more permissive level
+$\alpha=1.5$. Both cases use $\beta=2$ and $\epsilon=0.1$. A valid certificate
+$V$ must establish
 $\sup_{x\in X_0}V(x)\leq\alpha$ and
 $\inf_{x\in X_U}V(x)\geq\beta$.
 
@@ -53,9 +54,13 @@ generalized Itô–Tanaka formula. These interface checks are the genuinely
 piecewise part of the test and cannot be replaced by checking the smooth
 generator inside each region alone.
 
-The passing case uses $\epsilon=1.0$; the companion case raises it to $1.1$ and
-is intended to demonstrate rejection when the certified generator upper bound
-is no longer at most $-\epsilon$.
+Each test trains the PWQ certificate directly and then invokes the
+exact verifier with an OU generator implementation local to the test. The
+$\alpha=1.5$ case is the intended feasible case, but is currently marked as an
+expected failure because the baseline optimizer does not yet synthesize a
+valid certificate. The $\alpha=0.5$ case is expected not to verify. Keeping
+both cases in the same two-test file makes the intended training regression
+explicit without injecting a synthetic generator bound.
 
 ## Visualization
 
