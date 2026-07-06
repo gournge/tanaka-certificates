@@ -36,14 +36,14 @@
 
 \begin{abstract}
 This week I contributed by implementing a multidimensional verifier for ReLU neural 
-networks (with last layer being piecewise quadratic to ensure completeness) and proving
-it's correctness [TODO]. 
+networks (with last layer being piecewise quadratic to ensure completeness) and 
+beginning to prove its correctness. 
 After meeting with Greg, he recommended that I should focus on proving the correctness 
 of the ReLU NN region discovery algorithm and algebraically working through an example 
-2D SDE verification, which I did and present here.
+2D SDE verification, which I initially did and present here.
 I also worked on training a certificate for this problem - following the techniques used 
-by Greg in his previous paper -  but I failed to satisfy all the 
-constraints a certificate should have.
+by Greg in his previous paper -  but I failed to satisfy all the constraints a 
+certificate should have.
 \end{abstract}
 
 \tableofcontents
@@ -58,7 +58,12 @@ Consider a multi-dimensional stochastic differential equation
   dX_t=f(X_t)\,dt+g(X_t)\,dW_t
   \label{eq:sde}
 \end{equation}
-on a domain $D \subset \mathbb{R}^d$.  For a reach--avoid problem, let $X_0\subseteq D$ be the
+on a domain $D \subset \mathbb{R}^d$, where
+$f:\mathbb{R}^d\to\mathbb{R}^d$ is the drift,
+$g:\mathbb{R}^d\to\mathbb{R}^{d\times m}$ is the diffusion, and $W_t$
+is an $m$-dimensional Brownian motion.  Write
+$a(x)=g(x)g(x)^\top$ for the diffusion covariance.  For a
+reach--avoid problem, let $X_0\subseteq D$ be the
 initial set, $X_u\subseteq D$ the unsafe set, and $X_\tau\subseteq D$ the target.
 We seek a certificate $V$ and constants $\alpha<\beta$ and $\varepsilon>0$
 such that
@@ -77,9 +82,47 @@ such that
 \end{enumerate}
 where, at smooth points,
 \begin{equation}
-  \mathcal LV(x)=V'(x)f(x)+\frac12V''(x)g(x)^2.
+  \mathcal LV(x)
+  =\nabla V(x)\cdot f(x)
+  +\frac12\operatorname{tr}\!\left(a(x)\nabla^2V(x)\right).
   \label{eq:generator}
 \end{equation}
+
+Following the piecewise-quadratic setup, suppose that a compact verification
+region $K\subseteq D$ is partitioned into finitely many polyhedral cells,
+\[
+  K=\bigcup_{i=1}^N K_i,
+\]
+and that $V$ is continuous across their interfaces and quadratic on each cell:
+\begin{equation}
+  V(x)=V_i(x)
+  =c_i+p_i^\top x+\frac12x^\top Q_i x,
+  \qquad x\in K_i, \qquad Q_i=Q_i^\top.
+  \label{eq:pwq-cell}
+\end{equation}
+Consequently, inside $K_i$,
+\begin{equation}
+  \mathcal LV_i(x)
+  =(p_i+Q_i x)\cdot f(x)
+  +\frac12\operatorname{tr}\!\left(a(x)Q_i\right).
+  \label{eq:pwq-generator}
+\end{equation}
+Besides the interior generator condition, the multidimensional
+It\^o--Tanaka formula introduces a surface-local-time term on cell interfaces.
+For every shared face $F$ between $K_i$ and $K_j$, with unit normal
+$n_{i\to j,F}$ pointing from $K_i$ to $K_j$, this contribution is
+nonpositive when
+\begin{equation}
+  \left(\nabla V_j(x)-\nabla V_i(x)\right)\cdot n_{i\to j,F}
+  =\left(p_j-p_i+(Q_j-Q_i)x\right)\cdot n_{i\to j,F}
+  \leq 0,
+  \qquad x\in F.
+  \label{eq:interface-condition}
+\end{equation}
+Together with square-integrability of the stochastic integral, continuity,
+the cellwise generator condition, and this interface condition ensure that
+$V(X_t)$ is a supermartingale up to the first exit time from $K$.
+
 The process is stopped after reaching the target or unsafe set: once the
 reach--avoid property has been achieved or violated, its later trajectory is
 irrelevant.
@@ -426,6 +469,66 @@ piecewise quadratic expression changes.
 
 \section{2D SDE verification example}
 
+\newpage
+
 \section{Certificate training}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.425\textwidth]{img/verifier_pwq_2d_ornstein_uhlenbeck.png}
+  \caption{Verification of a piecewise-quadratic certificate for the
+  two-dimensional Ornstein--Uhlenbeck process.}
+  \label{fig:verifier-pwq-2d-ou}
+\end{figure}
+
+Before Greg gave feedback on my work, I was working on training a piecewise-quadratic certificate
+for a problem of an Urnstein--Uhlenbeck process in 2D, as seen on Figure~\ref{fig:verifier-pwq-2d-ou}.  
+
+I was training the certificate with the losses:
+\begin{enumerate}
+  \item \textbf{Boundary loss.}  On sampled points from the initial and unsafe
+  sets, including all corners of their hyperrectangles, I penalized
+  \(
+    \max\{V(x)- (\alpha-\delta),0\}
+  \)
+  for $x\in X_0$ and
+  \(
+    \max\{(\beta+\delta)-V(x),0\}
+  \)
+  for $x\in X_u$, where the constraint margin was $\delta=0.1$.
+
+  \item \textbf{Generator loss.}  For sampled domain points outside the target,
+  I penalized the cheaper of the two violations
+  \[
+    \max\{\mathcal{L}V(x)+\varepsilon+\delta_{\mathcal L},0\}
+    \quad\text{and}\quad
+    \max\{\beta+\delta-V(x),0\},
+  \]
+  with generator margin $\delta_{\mathcal L}=0.02$.  This reflects the
+  disjunctive condition that either $x\notin\{V\leq\beta\}$ or the generator
+  must be sufficiently negative.  This loss was enabled after 50 epochs of
+  boundary pretraining.
+
+  \item \textbf{Concavity loss.}  For sampled pairs $x,y$ from the same
+  hyperrectangle, I penalized violations of midpoint concavity,
+  \[
+    \max\left\{\frac{V(x)+V(y)}{2}
+      -V\left(\frac{x+y}{2}\right),0\right\}.
+  \]
+
+  \item \textbf{Regularization.}  I added a small mean-squared parameter
+  penalty to discourage unnecessarily large network weights.
+\end{enumerate}
+
+I verified it with an approximate verifier (that samples points instead of checking the entire region)
+and it found some violations of the certificate conditions, as seen on Figure~\ref{fig:trained-pwq-certificate-comparison}.  
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.85\textwidth]{img/certificate_comparison.png}
+  \caption{Comparison of the trained piecewise-quadratic certificate.}
+  \label{fig:trained-pwq-certificate-comparison}
+\end{figure}
+
 
 \end{document}
