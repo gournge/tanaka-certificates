@@ -70,8 +70,14 @@ timestamp and Git revision, such as
 
 ### Compiling TeX files
 
-Install a TeX distribution that includes `latexmk`, then run the following
-commands from the repository root.
+Install a TeX distribution that includes `latexmk` and `listings`. On Debian
+or Ubuntu, these are provided by:
+
+```bash
+sudo apt install latexmk texlive-latex-recommended
+```
+
+Then run the following commands from the repository root.
 
 To compile the research log:
 

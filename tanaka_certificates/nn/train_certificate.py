@@ -94,13 +94,14 @@ def train_pwq_certificate_baseline(
         initial_loss = _upper_level_loss(
             certificate, initial, ras.alpha - config.constraint_margin
         )
-        target_loss = _upper_level_loss(
-            certificate, target, ras.alpha - config.constraint_margin
-        )
+        # target_loss = _upper_level_loss(
+        #     certificate, target, 0 - config.constraint_margin
+        # )
         unsafe_loss = _lower_level_loss(
             certificate, unsafe, ras.beta + config.constraint_margin
         )
-        regional_loss = initial_loss + target_loss + unsafe_loss
+        # regional_loss = initial_loss + target_loss + unsafe_loss
+        regional_loss = initial_loss + unsafe_loss
 
         concavity_x, concavity_y = _sample_region_pairs(
             ras.domain,
