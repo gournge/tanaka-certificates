@@ -37,7 +37,7 @@
 \begin{abstract}
 This week I contributed by implementing a multidimensional verifier for ReLU neural 
 networks (with last layer being piecewise quadratic to ensure completeness) and proving
-it's correctness. 
+it's correctness [TODO]. 
 After meeting with Greg, he recommended that I should focus on proving the correctness 
 of the ReLU NN region discovery algorithm and algebraically working through an example 
 2D SDE verification, which I did and present here.
@@ -81,8 +81,8 @@ The process is stopped after reaching the target or unsafe set: once the
 reach--avoid property has been achieved or violated, its later trajectory is
 irrelevant.
 
-\begin{quote} \label{remark:piecewise-quadratic}
-  We model a certificate $V$ as:
+\begin{quote} 
+  \textbf{Remark}. \label{remark:piecewise-quadratic} We model a certificate $V$ as:
   \begin{align}
     V(x) &= \sum_{k=1}^m \lambda_k\phi(z_k(x))+c, \\
     z(x) &= \texttt{NN}(x)
@@ -114,17 +114,17 @@ def discover_cells(layers):
     """
 
     # A cell is (lower, upper, slope, intercept).
-    cells = [(-inf, inf, 1, 0)]
+    cells = [(-inf, inf, [1], [0])]
 
     for W, b in layers:
         new_cells = []
         for lower, upper, slope, intercept in cells:
             # key observation: in a cell C_prev(l, u, slope, intercept), we have 
-            #   z_prev = slope * x + intercept, so the linear function 
+            #   z_prev = slope @ x + intercept, so the linear function 
             # in the current cell C(?, ?, alpha, beta) will be
-            #   z = W * z_prev + b = (W * slope) * x + (W * intercept + b)
-            alpha = W * slope
-            beta = W * intercept + b
+            #   z = W @ z_prev + b = (W @ slope) @ x + (W @ intercept + b)
+            alpha = W @ slope
+            beta = W @ intercept + b
 
             roots = {
                 -beta[j] / alpha[j]
@@ -136,7 +136,7 @@ def discover_cells(layers):
 
             for left, right in consecutive_pairs(boundaries):
                 x = choose_point(left, right)
-                active = alpha * x + beta > 0
+                active = alpha @ x + beta > 0 # list of booleans
                 new_slope = where(active, alpha, 0)
                 new_intercept = where(active, beta, 0)
                 new_cells.append(
@@ -155,9 +155,30 @@ It discovers the linear cells of a one-dimensional ReLU network, with:
 
 To prove the correctness algorithms, the key step is to show, given a linear cell of the
 network up to layer \(m-1\), how to discover the linear cells of the network up to layer \(m\).
-As a precondition, we already have a linear cell of the network when we begin: 
-$\texttt{C(-$\infty$, $\infty$, 1, 0)}$ represents the entire real line, with slope 1 and intercept 0.
 
+As a precondition, we already have a linear cell of the network when we begin: 
+$\texttt{C(-$\infty$, $\infty$, [1], [0])}$ represents the entire real line, with slope [1] and intercept [0].
+
+Now, assume at layer \(m-1\) we have a linear cell \(\texttt{C(l, u, slope, intercept)}\) which is 
+correctly discovered.  Then, at layer \(m\), as shown in the code comment, we have a linear function:
+\begin{equation}
+  z = W \texttt{@} \ z_{m-1} + b = (W \texttt{@} \ \text{slope}) \texttt{@} x + (W \texttt{@} \ \text{intercept} + b)
+\end{equation}
+
+Since $z$ is a list of $n_m$ elements, we have to check when $z_j = 0$ for each $j=1,\ldots,n_m$.  
+This gives us the new potential breakpoints.
+
+Now, to determine how the resulting cells are formed, we can take a point within each interval 
+$(\texttt{breakpoint}_i, \texttt{breakpoint}_{i+1})$ and check whether the resulting neuron 
+would be active. This yields the new slope and intercept for that cell.
+
+\vspace{1em}
+\hrule 
+\vspace{1em}
+
+
+Note that in the actual implementation, the last layer is piecewise quadratic as noted in
+Remark \ref{remark:piecewise-quadratic}, but the proof of correctness is similar
 
 \section{2D SDE verification example}
 
