@@ -46,6 +46,9 @@ by Greg in his previous paper -  but I failed to satisfy all the
 constraints a certificate should have.
 \end{abstract}
 
+\tableofcontents
+\newpage
+
 \section{Multidimensional verifier}
 
 \subsection{Problem setup}
@@ -95,7 +98,7 @@ irrelevant.
 \end{quote}
 
 
-\section{Correctness proof of 1D ReLU NN region discovery}
+\section{1D ReLU NN region discovery}
 
 Consider the following Algorithm~\ref{alg:discover-1d-cells}  which discovers the linear cells of a one-dimensional ReLU network.
 
@@ -178,7 +181,248 @@ would be active. This yields the new slope and intercept for that cell.
 
 
 Note that in the actual implementation, the last layer is piecewise quadratic as noted in
-Remark \ref{remark:piecewise-quadratic}, but the proof of correctness is similar
+Remark \ref{remark:piecewise-quadratic}, but the reasoning is similar. We just further
+have to break up the cells based on the breakpoints of the piecewise quadratic function.
+
+\section{Multi-dimensional ReLU NN region discovery}
+
+We now extend Algorithm~\ref{alg:discover-1d-cells} to the multi-dimensional input case.
+The main difference is that the cells are no longer intervals, but convex polyhedra.
+
+Consider a ReLU network
+\begin{align}
+\texttt{NN}(x) &= W_L\texttt{ReLU}(\ldots\texttt{ReLU}(W_1x+b_1)\ldots)+b_L,
+\end{align}
+where now $x \in \mathbb{R}^{d}$.  As before, hidden layers can be multi-dimensional:
+\[
+W_i \in \mathbb{R}^{n_{i+1}\times n_i},
+\qquad
+b_i \in \mathbb{R}^{n_{i+1}}.
+\]
+
+In the one-dimensional case, a cell was represented by
+\[
+\texttt{C(l, u, slope, intercept)}.
+\]
+In the multi-dimensional case, we instead represent a cell by
+\[
+\texttt{C(A, c, slope, intercept)},
+\]
+where
+\[
+A x \leq c
+\]
+describes the current polyhedral region, and on this region we have
+\[
+z_{m-1} = \text{slope} \ x + \text{intercept}.
+\]
+Here
+\[
+\text{slope} \in \mathbb{R}^{n_{m-1}\times d},
+\qquad
+\text{intercept} \in \mathbb{R}^{n_{m-1}}.
+\]
+
+As a precondition, we already have a linear cell of the network when we begin:
+\[
+\texttt{C([], [], I, 0)}
+\]
+represents the entire space $\mathbb{R}^d$, with slope $I$ and intercept $0$.
+
+Now, assume at layer $m-1$ we have a linear cell
+\[
+\texttt{C(A, c, slope, intercept)}
+\]
+which is correctly discovered.  Then, at layer $m$, we again have a linear function:
+\begin{equation}
+z = W \texttt{@} \ z_{m-1} + b
+= (W \texttt{@} \ \text{slope}) \texttt{@} x
++ (W \texttt{@} \ \text{intercept} + b).
+\end{equation}
+Therefore define
+\begin{align}
+\alpha &= W \texttt{@} \ \text{slope}, \\
+\beta  &= W \texttt{@} \ \text{intercept} + b.
+\end{align}
+Then, inside the current cell, every pre-activation is of the form
+\begin{equation}
+z_j = \alpha_j x + \beta_j,
+\end{equation}
+where $\alpha_j$ is the $j$-th row of $\alpha$.
+
+In the one-dimensional case, the possible new boundaries were points satisfying
+\[
+\alpha_j x + \beta_j = 0.
+\]
+In the multi-dimensional case, the possible new boundaries are hyperplanes:
+\begin{equation}
+\alpha_j x + \beta_j = 0,
+\qquad j=1,\ldots,n_m.
+\end{equation}
+
+Each such hyperplane splits the current polyhedral cell into two possible pieces:
+\begin{align}
+\alpha_j x + \beta_j &\geq 0,
+&&\text{where neuron } j \text{ is active}, \\
+\alpha_j x + \beta_j &\leq 0,
+&&\text{where neuron } j \text{ is inactive}.
+\end{align}
+
+Thus, instead of sorting roots on the real line, we refine the current region by intersecting it
+with all possible activation constraints.  Equivalently, for each activation pattern
+\[
+s \in \{0,1\}^{n_m},
+\]
+we construct the candidate region
+\begin{equation}
+R_s =
+\left\{
+x :
+A x \leq c,
+\quad
+\alpha_j x + \beta_j \geq 0 \ \text{if } s_j=1,
+\quad
+\alpha_j x + \beta_j \leq 0 \ \text{if } s_j=0
+\right\}.
+\end{equation}
+
+If $R_s$ is non-empty, then it is a new linear cell.  On this cell, the ReLU activation is fixed,
+so we get
+\begin{align}
+\texttt{new\_slope}
+&= \texttt{where}(s, \alpha, 0), \\
+\texttt{new\_intercept}
+&= \texttt{where}(s, \beta, 0).
+\end{align}
+This is the exact multi-dimensional analogue of the one-dimensional update.
+
+\newpage
+
+The corresponding algorithm is:
+
+\begin{lstlisting}[
+language=Python,
+caption={Discover multi-dimensional linear regions of a ReLU network},
+label={alg:discover-multidim-cells}
+]
+def discover_regions(layers, d):
+  """
+  The network has a d-dimensional input. Hidden layers can be multi-dimensional:
+  >>> layers[i] = (W_i, b_i)
+  >>> W_i.shape = (n_{i+1}, n_i)
+  >>> b_i.shape = (n_{i+1},)
+  """
+
+  # A cell is (A, c, slope, intercept), where
+  #   A @ x <= c
+  # A.shape = (num_constraints, d)
+  # slope.shape = (num_constraints, d)
+  # and inside this region
+  #   z = slope @ x + intercept.
+  cells = [([], [], I_d, 0)]
+
+  for W, b in layers:
+      new_cells = []
+      for A, c, slope, intercept in cells:
+          # key observation: in a cell C(A, c, slope, intercept), we have
+          #   z_prev = slope @ x + intercept, so the linear function
+          # in the current cell C(?, ?, alpha, beta) will be
+          #   z = W @ z_prev + b = (W @ slope) @ x + (W @ intercept + b)
+          alpha = W @ slope
+          beta = W @ intercept + b
+
+          for active in all_boolean_patterns(len(beta)):
+              A_new = list(A)
+              c_new = list(c)
+
+              for j in range(len(beta)):
+                  if active[j]:
+                      # alpha[j] @ x + beta[j] >= 0
+                      # equivalently: -alpha[j] @ x <= beta[j]
+                      A_new.append(-alpha[j])
+                      c_new.append(beta[j])
+                  else:
+                      # alpha[j] @ x + beta[j] <= 0
+                      # equivalently: alpha[j] @ x <= -beta[j]
+                      A_new.append(alpha[j])
+                      c_new.append(-beta[j])
+
+              if is_nonempty_polyhedron(A_new, c_new):
+                  new_slope = where(active, alpha, 0)
+                  new_intercept = where(active, beta, 0)
+                  new_cells.append(
+                      (A_new, c_new, new_slope, new_intercept)
+                  )
+
+      cells = new_cells
+
+  return cells
+\end{lstlisting}
+
+To prove the correctness of the algorithm, the key step is again to show, given a linear cell of
+the network up to layer $m-1$, how to discover the linear cells of the network up to layer $m$.
+
+Assume that at layer $m-1$ we have correctly discovered a cell
+\[
+\texttt{C(A, c, slope, intercept)}.
+\]
+By correctness of this cell, for all $x$ satisfying $A x \leq c$, we have
+\[
+z_{m-1} = \text{slope} \ x + \text{intercept}.
+\]
+After applying the affine map of layer $m$, we obtain
+\[
+z = Wz_{m-1}+b
+= (W \texttt{@} \ \text{slope})x
++ (W \texttt{@} \ \text{intercept}+b)
+= \alpha x + \beta.
+\]
+Therefore, inside the current cell, the sign of each neuron is determined by the affine inequality
+\[
+\alpha_j x + \beta_j \gtreqless 0.
+\]
+
+The ReLU is linear exactly on regions where these signs are fixed.  Hence, the current cell must
+be split according to all possible choices of signs of
+\[
+\alpha_1 x + \beta_1,\ldots,\alpha_{n_m}x+\beta_{n_m}.
+\]
+For a fixed activation pattern $s$, the region $R_s$ is precisely the set of points in the old
+cell which realize that activation pattern.  If this region is empty, then that pattern never
+occurs in the old cell and should be discarded.  If it is non-empty, then the ReLU output on this
+region is
+\[
+\texttt{ReLU}(z)_j =
+\begin{cases}
+\alpha_j x + \beta_j, & s_j=1, \\
+0, & s_j=0.
+\end{cases}
+\]
+Thus, on $R_s$, the new representation is exactly
+\begin{align}
+\texttt{new\_slope}
+&= \texttt{where}(s, \alpha, 0), \\
+\texttt{new\_intercept}
+&= \texttt{where}(s, \beta, 0).
+\end{align}
+
+Therefore every non-empty region generated by the algorithm is a correct linear cell for the
+network up to layer $m$. Conversely, any true linear cell of the network up to layer $m$ must
+lie inside some previously discovered cell at layer $m-1$, and must have a fixed activation
+pattern at layer $m$. Hence it is contained in one of the non-empty regions $R_s$ constructed
+above. This proves that the algorithm discovers exactly the linear cells of the network layer by
+layer.
+
+\vspace{1em}
+\hrule
+\vspace{1em}
+
+Note that, just as in the one-dimensional case, if the last layer is piecewise quadratic as noted
+in Remark \ref{remark:piecewise-quadratic}, the same reasoning applies.  The only difference is
+that instead of further splitting intervals by the breakpoints of the piecewise quadratic
+function, we further split polyhedral cells by the hypersurfaces on which the corresponding
+piecewise quadratic expression changes.
+
 
 \section{2D SDE verification example}
 
