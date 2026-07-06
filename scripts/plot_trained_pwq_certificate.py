@@ -17,8 +17,8 @@ from tanaka_certificates.nn.train_certificate import (
     TrainingCertificateConfiguration,
     train_pwq_certificate_baseline,
 )
+from tanaka_certificates.problems import make_ou_problem
 from tanaka_certificates.ra import ReachAvoidProblem
-from tanaka_certificates.regions import HyperrectangleUnion, create_hyperrectangle
 from tanaka_certificates.sde import EulerMaruyama, IsotropicOrnsteinUhlenbeck
 from tanaka_certificates.verifier import (
     IssueKind,
@@ -48,26 +48,6 @@ class _OUGeneratorBounder:
             p=2.0 * rate * cell.Q @ mean - rate * cell.p,
             c=float(rate * cell.p @ mean + self.sde.volatility**2 * np.trace(cell.Q)),
         )
-
-
-def make_ou_problem(
-    alpha: float = 0.5,
-) -> tuple[IsotropicOrnsteinUhlenbeck, ReachAvoidProblem]:
-    """Return the OU reach-avoid problem used by the multidimensional test."""
-    sde = IsotropicOrnsteinUhlenbeck(2, volatility=0.5)
-    problem = ReachAvoidProblem(
-        domain=create_hyperrectangle([-1.0, -1.25], [1.25, 0.75]),
-        initial=create_hyperrectangle([0.9, -1.1], [1.1, -0.9]),
-        unsafe=HyperrectangleUnion(
-            create_hyperrectangle([-0.2, -1.2], [0.2, -0.8]),
-            create_hyperrectangle([0.8, -0.2], [1.2, 0.2]),
-        ),
-        target=create_hyperrectangle([-0.1, -0.1], [0.1, 0.1]),
-        alpha=alpha,
-        beta=2.0,
-        epsilon=0.1,
-    )
-    return sde, problem
 
 
 def make_default_training_configuration(

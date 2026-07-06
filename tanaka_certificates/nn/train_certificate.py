@@ -24,11 +24,13 @@ class TrainingCertificateConfiguration:
     learning_rate: float = 3e-3
     boundary_loss_weight: float = 20.0
     generator_loss_weight: float = 5.0
+    concavity_loss_weight: float = 5.0
     regularization_weight: float = 1e-6
     constraint_margin: float = 0.1
     generator_margin: float = 0.02
     gradient_clip: float = 10.0
     boundary_pretraining_epochs: int = 50
+    boundary_sampling_probability: float = 0.9
     record_network_weights_over_time: bool = True
     torch_seed: int = 2026
 
@@ -59,6 +61,14 @@ def train_pwq_certificate_baseline(
     certificate = PiecewiseQuadraticCertificate(
         nn.Linear(sde.state_dim, config.hidden_width, dtype=dtype),
         nn.ReLU(),
+        # nn.Linear(config.hidden_width, config.hidden_width, dtype=dtype),
+        # nn.ReLU(),
+        # nn.Linear(config.hidden_width, config.hidden_width, dtype=dtype),
+        # nn.ReLU(),
+        nn.Linear(config.hidden_width, config.hidden_width, dtype=dtype),
+        nn.ReLU(),
+        nn.Linear(config.hidden_width, config.hidden_width, dtype=dtype),
+        nn.ReLU(),
         nn.Linear(config.hidden_width, config.hidden_width, dtype=dtype),
         nn.ReLU(),
         nn.Linear(config.hidden_width, 1, dtype=dtype),
@@ -71,19 +81,44 @@ def train_pwq_certificate_baseline(
 
     for epoch in range(config.epochs):
         optimizer.zero_grad()
-        initial = _training_region_points(ras.initial, config.batch_size, dtype)
-        unsafe = _training_region_points(ras.unsafe, config.batch_size, dtype)
-        target = _training_region_points(ras.target, config.batch_size, dtype)
+        initial = _training_region_points(
+            ras.initial, config.batch_size, dtype, config.boundary_sampling_probability
+        )
+        unsafe = _training_region_points(
+            ras.unsafe, config.batch_size, dtype, config.boundary_sampling_probability
+        )
+        target = _training_region_points(
+            ras.target, config.batch_size, dtype, config.boundary_sampling_probability
+        )
 
-        initial_loss = _upper_level_loss(certificate, initial, ras.alpha - config.constraint_margin)
-        target_loss = _upper_level_loss(certificate, target, ras.alpha - config.constraint_margin)
-        unsafe_loss = _lower_level_loss(certificate, unsafe, ras.beta + config.constraint_margin)
+        initial_loss = _upper_level_loss(
+            certificate, initial, ras.alpha - config.constraint_margin
+        )
+        target_loss = _upper_level_loss(
+            certificate, target, ras.alpha - config.constraint_margin
+        )
+        unsafe_loss = _lower_level_loss(
+            certificate, unsafe, ras.beta + config.constraint_margin
+        )
         regional_loss = initial_loss + target_loss + unsafe_loss
+
+        concavity_x, concavity_y = _sample_region_pairs(
+            ras.domain,
+            config.batch_size,
+            dtype,
+            config.boundary_sampling_probability,
+        )
+        concavity_loss = _concavity_loss(certificate, concavity_x, concavity_y)
 
         zero = sum((parameter.sum() * 0.0 for parameter in certificate.parameters()))
         generator_loss = zero
         if epoch >= config.boundary_pretraining_epochs:
-            domain = _sample_region(ras.domain, config.batch_size, dtype)
+            domain = _sample_region(
+                ras.domain,
+                config.batch_size,
+                dtype,
+                config.boundary_sampling_probability,
+            )
             domain = domain.requires_grad_(True)
             values, generator = _values_and_generator(certificate, sde, domain)
             outside_target = torch.tensor(
@@ -109,9 +144,12 @@ def train_pwq_certificate_baseline(
                 )
                 generator_loss = _worst_case_loss(violations)
 
-        regularization = sum(parameter.square().mean() for parameter in certificate.parameters())
+        regularization = sum(
+            parameter.square().mean() for parameter in certificate.parameters()
+        )
         loss = config.boundary_loss_weight * regional_loss
         loss = loss + config.generator_loss_weight * generator_loss
+        loss = loss + config.concavity_loss_weight * concavity_loss
         loss = loss + config.regularization_weight * regularization
         loss.backward()
         nn.utils.clip_grad_norm_(certificate.parameters(), config.gradient_clip)
@@ -119,6 +157,7 @@ def train_pwq_certificate_baseline(
         final_losses = {
             "regional": float(regional_loss.detach()),
             "generator": float(generator_loss.detach()),
+            "concavity": float(concavity_loss.detach()),
             "regularization": float(regularization.detach()),
             "total": float(loss.detach()),
         }
@@ -143,8 +182,20 @@ def _region_corners(region) -> torch.Tensor:
     return torch.as_tensor(np.asarray(corners), dtype=torch.get_default_dtype())
 
 
-def _training_region_points(region, count, dtype):
-    return torch.cat((_sample_region(region, count, dtype), _region_corners(region).to(dtype)))
+def _training_region_points(region, count, dtype, boundary_probability=0.9):
+    return torch.cat(
+        (
+            _sample_region(region, count, dtype, boundary_probability),
+            _region_corners(region).to(dtype),
+        )
+    )
+
+
+def _concavity_loss(certificate, x, y):
+    """Penalize violations of V((x + y) / 2) >= (V(x) + V(y)) / 2."""
+    midpoint_values = certificate((x + y) / 2.0).squeeze(-1)
+    endpoint_average = (certificate(x).squeeze(-1) + certificate(y).squeeze(-1)) / 2.0
+    return _worst_case_loss(torch.relu(endpoint_average - midpoint_values))
 
 
 def _upper_level_loss(certificate, points, bound):
@@ -170,21 +221,34 @@ def _validate_inputs(sde, ras, config) -> None:
         config.hidden_width,
     )
     if config.epochs < 0 or any(value <= 0 for value in positive):
-        raise ValueError("epochs must be nonnegative and sizes/intervals must be positive")
-    if min(
-        config.boundary_loss_weight,
-        config.generator_loss_weight,
-        config.regularization_weight,
-        config.constraint_margin,
-        config.generator_margin,
-    ) < 0:
+        raise ValueError(
+            "epochs must be nonnegative and sizes/intervals must be positive"
+        )
+    if (
+        min(
+            config.boundary_loss_weight,
+            config.generator_loss_weight,
+            config.concavity_loss_weight,
+            config.regularization_weight,
+            config.constraint_margin,
+            config.generator_margin,
+        )
+        < 0
+    ):
         raise ValueError("loss weights and margins must be nonnegative")
+    if not 0.0 <= config.boundary_sampling_probability <= 1.0:
+        raise ValueError("boundary_sampling_probability must be between zero and one")
     for name in ("domain", "initial", "unsafe", "target"):
         if getattr(ras, name).dimension != sde.state_dim:
             raise ValueError(f"{name} dimension does not match the SDE")
 
 
-def _sample_region(region, count: int, dtype: torch.dtype) -> torch.Tensor:
+def _sample_region(
+    region,
+    count: int,
+    dtype: torch.dtype,
+    boundary_probability: float = 0.9,
+) -> torch.Tensor:
     rectangles = getattr(region, "hyperrectangles", (region,))
     choices = torch.randint(len(rectangles), (count,))
     points = torch.empty((count, region.dimension), dtype=dtype)
@@ -192,8 +256,41 @@ def _sample_region(region, count: int, dtype: torch.dtype) -> torch.Tensor:
         mask = choices == index
         low = torch.tensor(np.asarray(rectangle.lower), dtype=dtype)
         high = torch.tensor(np.asarray(rectangle.upper), dtype=dtype)
-        points[mask] = low + torch.rand((int(mask.sum()), region.dimension), dtype=dtype) * (high - low)
+        rectangle_count = int(mask.sum())
+        rectangle_points = low + torch.rand(
+            (rectangle_count, region.dimension), dtype=dtype
+        ) * (high - low)
+        on_boundary = torch.rand(rectangle_count) < boundary_probability
+        boundary_rows = torch.nonzero(on_boundary, as_tuple=False).squeeze(-1)
+        if boundary_rows.numel():
+            dimensions = torch.randint(region.dimension, (len(boundary_rows),))
+            use_upper = torch.randint(2, (len(boundary_rows),)).bool()
+            rectangle_points[boundary_rows, dimensions] = torch.where(
+                use_upper, high[dimensions], low[dimensions]
+            )
+        points[mask] = rectangle_points
     return points
+
+
+def _sample_region_pairs(
+    region,
+    count: int,
+    dtype: torch.dtype,
+    boundary_probability: float = 0.9,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Sample pairs from the same rectangle, keeping their midpoint in the region."""
+    rectangles = getattr(region, "hyperrectangles", (region,))
+    choices = torch.randint(len(rectangles), (count,))
+    x = torch.empty((count, region.dimension), dtype=dtype)
+    y = torch.empty_like(x)
+    for index, rectangle in enumerate(rectangles):
+        mask = choices == index
+        pair_count = int(mask.sum())
+        if pair_count == 0:
+            continue
+        x[mask] = _sample_region(rectangle, pair_count, dtype, boundary_probability)
+        y[mask] = _sample_region(rectangle, pair_count, dtype, boundary_probability)
+    return x, y
 
 
 def _values_and_generator(certificate, sde, points):
@@ -202,7 +299,10 @@ def _values_and_generator(certificate, sde, points):
     hessian = torch.stack(
         [
             torch.autograd.grad(
-                gradient[:, dimension].sum(), points, create_graph=True, retain_graph=True
+                gradient[:, dimension].sum(),
+                points,
+                create_graph=True,
+                retain_graph=True,
             )[0]
             for dimension in range(sde.state_dim)
         ],

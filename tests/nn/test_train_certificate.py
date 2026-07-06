@@ -3,7 +3,9 @@ import torch
 
 from tanaka_certificates.nn.train_certificate import (
     TrainingCertificateConfiguration,
+    _concavity_loss,
     _region_corners,
+    _sample_region,
     train_pwq_certificate_baseline,
 )
 from tanaka_certificates.piecewise_lookup import PiecewiseQuadraticLookupBaseline
@@ -42,7 +44,7 @@ def test_training_baseline_returns_cell_discoverable_certificate():
     assert torch.isfinite(output).all()
     domain_points = torch.rand((256, 2)) * 2.0 - 1.0
     assert torch.all(certificate(domain_points) >= -1e-6)
-    assert len(certificate) == 6
+    assert len(certificate) == 14
     assert not certificate.final_linear_has_relu()
     assert len(certificate.training_artifact.network_over_time) == 2
     assert PiecewiseQuadraticLookupBaseline(certificate, sde).get_cells()
@@ -78,3 +80,36 @@ def test_region_corners_include_every_union_rectangle_corner():
         tuple(np.asarray(point, dtype=corners.dtype)) for point in expected
     }
     assert {tuple(point) for point in corners} == expected_at_training_dtype
+
+
+def test_boundary_sampler_places_requested_points_on_edges():
+    region = _problem().domain
+    points = _sample_region(region, 100, torch.float32, boundary_probability=1.0)
+
+    lower = torch.tensor(region.lower, dtype=points.dtype)
+    upper = torch.tensor(region.upper, dtype=points.dtype)
+    on_boundary = ((points == lower) | (points == upper)).any(dim=1)
+    assert on_boundary.all()
+
+
+def test_concavity_loss_penalizes_convex_midpoint_gap():
+    class SquaredNorm(torch.nn.Module):
+        def forward(self, points):
+            return points.square().sum(dim=1, keepdim=True)
+
+    x = torch.tensor([[-1.0, 0.0], [0.0, -2.0]])
+    y = -x
+    loss = _concavity_loss(SquaredNorm(), x, y)
+
+    assert loss.item() == 5.0
+
+
+def test_concavity_loss_accepts_concave_function():
+    class NegativeSquaredNorm(torch.nn.Module):
+        def forward(self, points):
+            return -points.square().sum(dim=1, keepdim=True)
+
+    x = torch.tensor([[-1.0, 0.0], [0.0, -2.0]])
+    y = -x
+
+    assert _concavity_loss(NegativeSquaredNorm(), x, y).item() == 0.0

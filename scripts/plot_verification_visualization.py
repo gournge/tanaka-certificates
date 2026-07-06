@@ -8,22 +8,13 @@ from matplotlib.patches import Patch, Rectangle
 import numpy as np
 
 from tanaka_certificates import ResultArtifact
-from tanaka_certificates.sde import EulerMaruyama, IsotropicOrnsteinUhlenbeck
+from tanaka_certificates.problems import make_ou_problem
+from tanaka_certificates.sde import EulerMaruyama
 
 
 DEFAULT_OUTPUT = Path("output")
 DEFAULT_DOCUMENTATION_IMAGE = Path(
     "docs/dev/img/verifier_pwq_2d_ornstein_uhlenbeck.png"
-)
-DOMAIN_LOWER = np.array([-1.0, -1.25])
-DOMAIN_UPPER = np.array([1.25, 0.75])
-INITIAL_LOWER = np.array([0.9, -1.1])
-INITIAL_UPPER = np.array([1.1, -0.9])
-TARGET_LOWER = np.array([-0.1, -0.1])
-TARGET_UPPER = np.array([0.1, 0.1])
-UNSAFE_BOXES = (
-    (np.array([-0.2, -1.2]), np.array([0.2, -0.8])),
-    (np.array([0.8, -0.2]), np.array([1.2, 0.2])),
 )
 TRAJECTORY_COLOR = "#315f8c"
 
@@ -63,11 +54,11 @@ def plot_verification_visualization(
 
     figure, axis = plt.subplots(figsize=(6.4, 6.4))
     solver = EulerMaruyama()
-    sde = IsotropicOrnsteinUhlenbeck(2, volatility=0.5)
+    sde, problem = make_ou_problem()
     rng = np.random.default_rng(seed)
 
     for path_index in range(n_paths):
-        initial = rng.uniform(INITIAL_LOWER, INITIAL_UPPER)
+        initial = rng.uniform(problem.initial.lower, problem.initial.upper)
         _, states = solver.simulate(
             sde, initial, horizon, n_steps, seed=seed + path_index + 1
         )
@@ -82,8 +73,8 @@ def plot_verification_visualization(
 
     axis.add_patch(
         _rectangle(
-            DOMAIN_LOWER,
-            DOMAIN_UPPER,
+            problem.domain.lower,
+            problem.domain.upper,
             facecolor="none",
             edgecolor="#333333",
             alpha=1.0,
@@ -92,8 +83,8 @@ def plot_verification_visualization(
     )
     axis.add_patch(
         _rectangle(
-            INITIAL_LOWER,
-            INITIAL_UPPER,
+            problem.initial.lower,
+            problem.initial.upper,
             facecolor="#f2b84b",
             edgecolor="#9a6500",
             alpha=0.8,
@@ -102,19 +93,19 @@ def plot_verification_visualization(
     )
     axis.add_patch(
         _rectangle(
-            TARGET_LOWER,
-            TARGET_UPPER,
+            problem.target.lower,
+            problem.target.upper,
             facecolor="#52a76b",
             edgecolor="#236b38",
             alpha=0.85,
             zorder=5,
         )
     )
-    for lower, upper in UNSAFE_BOXES:
+    for unsafe in problem.unsafe:
         axis.add_patch(
             _rectangle(
-                lower,
-                upper,
+                unsafe.lower,
+                unsafe.upper,
                 facecolor="#d95c5c",
                 edgecolor="#8f2020",
                 alpha=0.75,
@@ -126,8 +117,8 @@ def plot_verification_visualization(
         xlabel=r"$x_1$",
         ylabel=r"$x_2$",
         title="2D Ornstein--Uhlenbeck reach-avoid verification problem",
-        xlim=(DOMAIN_LOWER[0] - 0.05, DOMAIN_UPPER[0] + 0.05),
-        ylim=(DOMAIN_LOWER[1] - 0.05, DOMAIN_UPPER[1] + 0.05),
+        xlim=(problem.domain.lower[0] - 0.05, problem.domain.upper[0] + 0.05),
+        ylim=(problem.domain.lower[1] - 0.05, problem.domain.upper[1] + 0.05),
     )
     axis.set_aspect("equal", adjustable="box")
     axis.grid(alpha=0.2)

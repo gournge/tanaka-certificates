@@ -7,9 +7,7 @@ from tanaka_certificates.nn.train_certificate import (
     TrainingCertificateConfiguration,
     train_pwq_certificate_baseline,
 )
-from tanaka_certificates.ra import ReachAvoidProblem
-from tanaka_certificates.regions import HyperrectangleUnion, create_hyperrectangle
-from tanaka_certificates.sde import IsotropicOrnsteinUhlenbeck
+from tanaka_certificates.problems import make_ou_problem
 from tanaka_certificates.verifier import (
     QuadraticForm,
     VerificationResult,
@@ -34,19 +32,7 @@ class OUGeneratorBounder:
 
 
 def _train_and_verify(alpha):
-    sde = IsotropicOrnsteinUhlenbeck(2, volatility=0.5)
-    problem = ReachAvoidProblem(
-        domain=create_hyperrectangle([-1.0, -1.25], [1.25, 0.75]),
-        initial=create_hyperrectangle([0.9, -1.1], [1.1, -0.9]),
-        unsafe=HyperrectangleUnion(
-            create_hyperrectangle([-0.2, -1.2], [0.2, -0.8]),
-            create_hyperrectangle([0.8, -0.2], [1.2, 0.2]),
-        ),
-        target=create_hyperrectangle([-0.1, -0.1], [0.1, 0.1]),
-        alpha=alpha,
-        beta=2.0,
-        epsilon=0.1,
-    )
+    sde, problem = make_ou_problem(alpha=alpha)
     certificate = train_pwq_certificate_baseline(
         sde,
         problem,
