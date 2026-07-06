@@ -1,0 +1,166 @@
+\documentclass[10pt]{extarticle}
+
+\usepackage[margin=1.8cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  urlcolor=blue!60!black
+]{hyperref}
+
+\setlist{itemsep=2pt,topsep=4pt}
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue!60!black}\bfseries,
+  commentstyle=\color{green!40!black}\itshape,
+  frame=single,
+  numbers=left,
+  numberstyle=\scriptsize\color{black!55},
+  numbersep=8pt,
+  showstringspaces=false,
+  columns=fullflexible,
+  keepspaces=true
+}
+
+\title{Tanaka Certificates: Weekly Research Report}
+\author{Filip Morawiec}
+\date{6 July 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This week I contributed by implementing a multidimensional verifier for ReLU neural 
+networks (with last layer being piecewise quadratic to ensure completeness) and proving
+it's correctness. 
+After meeting with Greg, he recommended that I should focus on proving the correctness 
+of the ReLU NN region discovery algorithm and algebraically working through an example 
+2D SDE verification, which I did and present here.
+I also worked on training a certificate for this problem - following the techniques used 
+by Greg in his previous paper -  but I failed to satisfy all the 
+constraints a certificate should have.
+\end{abstract}
+
+\section{Multidimensional verifier}
+
+\subsection{Problem setup}
+
+Consider a multi-dimensional stochastic differential equation
+\begin{equation}
+  dX_t=f(X_t)\,dt+g(X_t)\,dW_t
+  \label{eq:sde}
+\end{equation}
+on a domain $D \subset \mathbb{R}^d$.  For a reach--avoid problem, let $X_0\subseteq D$ be the
+initial set, $X_u\subseteq D$ the unsafe set, and $X_\tau\subseteq D$ the target.
+We seek a certificate $V$ and constants $\alpha<\beta$ and $\varepsilon>0$
+such that
+\begin{enumerate}
+  \item boundary condition holds: 
+  \begin{equation}
+    \label{eq:boundary-conditions}
+    \sup_{x\in X_0}V(x)\leq\alpha \qquad\text{and}\qquad
+    \inf_{x\in X_u}V(x)\geq\beta
+  \end{equation}
+  \item generator condition holds: 
+  \begin{equation}
+    \label{eq:generator-conditions}
+    \mathcal LV(x)\leq-\varepsilon \qquad\text{for }x\in\{V\leq\beta\}\setminus X_\tau,
+  \end{equation}
+\end{enumerate}
+where, at smooth points,
+\begin{equation}
+  \mathcal LV(x)=V'(x)f(x)+\frac12V''(x)g(x)^2.
+  \label{eq:generator}
+\end{equation}
+The process is stopped after reaching the target or unsafe set: once the
+reach--avoid property has been achieved or violated, its later trajectory is
+irrelevant.
+
+\begin{quote} \label{remark:piecewise-quadratic}
+  We model a certificate $V$ as:
+  \begin{align}
+    V(x) &= \sum_{k=1}^m \lambda_k\phi(z_k(x))+c, \\
+    z(x) &= \texttt{NN}(x)
+      = W_L\texttt{ReLU}(\ldots\texttt{ReLU}(W_1x+b_1)\ldots)+b_L, \\
+    \phi &= \texttt{PiecewiseQuadratic1D}.
+  \end{align}
+  This way, because we include a piecewise quadratic function $\phi$ in the last layer, 
+  we cover a certain failure case related to the curvature term $V''(x)$ in the 
+  generator condition \eqref{eq:generator-conditions}.    
+\end{quote}
+
+
+\section{Correctness proof of 1D ReLU NN region discovery}
+
+Consider the following Algorithm~\ref{alg:discover-1d-cells}  which discovers the linear cells of a one-dimensional ReLU network.
+
+\begin{lstlisting}[
+  language=Python,
+  caption={Discover one-dimensional linear cells of a ReLU network},
+  label={alg:discover-1d-cells}
+]
+def discover_cells(layers):
+    """
+    The network has a one-dimensional input and a one-dimensional output, but hidden
+    layers can be multi-dimensional:
+    >>> layers[i] = (W_i, b_i)
+    >>> W_i.shape = (n_{i+1}, n_i)
+    >>> b_i.shape = (n_{i+1},)    
+    """
+
+    # A cell is (lower, upper, slope, intercept).
+    cells = [(-inf, inf, 1, 0)]
+
+    for W, b in layers:
+        new_cells = []
+        for lower, upper, slope, intercept in cells:
+            # key observation: in a cell C_prev(l, u, slope, intercept), we have 
+            #   z_prev = slope * x + intercept, so the linear function 
+            # in the current cell C(?, ?, alpha, beta) will be
+            #   z = W * z_prev + b = (W * slope) * x + (W * intercept + b)
+            alpha = W * slope
+            beta = W * intercept + b
+
+            roots = {
+                -beta[j] / alpha[j]
+                for j in range(len(beta))
+                if alpha[j] != 0
+                and lower < -beta[j] / alpha[j] < upper
+            }
+            boundaries = [lower, *sorted(roots), upper]
+
+            for left, right in consecutive_pairs(boundaries):
+                x = choose_point(left, right)
+                active = alpha * x + beta > 0
+                new_slope = where(active, alpha, 0)
+                new_intercept = where(active, beta, 0)
+                new_cells.append(
+                    (left, right, new_slope, new_intercept)
+                )
+
+        cells = new_cells
+
+    return cells
+\end{lstlisting}
+
+It discovers the linear cells of a one-dimensional ReLU network, with:
+\begin{align}
+  \texttt{NN}(x) &= W_L\texttt{ReLU}(\ldots\texttt{ReLU}(W_1x+b_1)\ldots)+b_L.
+\end{align}
+
+To prove the correctness algorithms, the key step is to show, given a linear cell of the
+network up to layer \(m-1\), how to discover the linear cells of the network up to layer \(m\).
+As a precondition, we already have a linear cell of the network when we begin: 
+$\texttt{C(-$\infty$, $\infty$, 1, 0)}$ represents the entire real line, with slope 1 and intercept 0.
+
+
+\section{2D SDE verification example}
+
+\section{Certificate training}
+
+\end{document}
