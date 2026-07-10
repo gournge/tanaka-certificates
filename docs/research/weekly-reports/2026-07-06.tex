@@ -42,12 +42,27 @@ After meeting with Greg, he recommended that I should focus on proving the corre
 of the ReLU NN region discovery algorithm and algebraically working through an example 
 2D SDE verification, which I initially did and present here.
 I also worked on training a certificate for this problem - following the techniques used 
-by Greg in his previous paper -  but I failed to satisfy all the constraints a 
+by Greg in his previous paper - but I failed to satisfy all the constraints a 
 certificate should have.
 \end{abstract}
 
 \tableofcontents
 \newpage
+
+\section{Recap of last week's verifier}
+
+Last week I implemented a one-dimensional verifier for ReLU neural networks (which are
+effectively piecewise linear functions). On the Figure~\ref{fig:verifier-pwl-1d-ou} we
+can see sample paths and how samples $V(X_t)$ look like they satisfy the supermartingale property.  
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.425\textwidth]{../../dev/img/verifier_pwl_1d_ornstein_uhlenbeck.png}
+  \caption{Verification of a piecewise-linear certificate for the
+  one-dimensional Ornstein--Uhlenbeck process.}
+  \label{fig:verifier-pwl-1d-ou}
+\end{figure}
+
 
 \section{Multidimensional verifier}
 
@@ -122,6 +137,16 @@ nonpositive when
 Together with square-integrability of the stochastic integral, continuity,
 the cellwise generator condition, and this interface condition ensure that
 $V(X_t)$ is a supermartingale up to the first exit time from $K$.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{img/interface_condition_examples.png}
+  \caption{Examples of the interface condition on a two-cell partition with
+  interface $F=\{x_1=0\}$ and normal $n=e_1$.  The condition is satisfied when
+  the normal derivative on the right cell does not exceed the normal derivative
+  on the left cell along the whole interface.}
+  \label{fig:interface-condition-examples}
+\end{figure}
 
 The process is stopped after reaching the target or unsafe set: once the
 reach--avoid property has been achieved or violated, its later trajectory is
@@ -467,7 +492,310 @@ function, we further split polyhedral cells by the hypersurfaces on which the co
 piecewise quadratic expression changes.
 
 
-\section{2D SDE verification example}
+\section{2D SDE verification example - work in progress!}
+
+Here is a small algebraic example which follows the sufficient conditions from the
+multidimensional piecewise-quadratic verifier.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{img/pwq_2d_verification_example.png}
+  \caption{The explicit two-dimensional piecewise-quadratic verification
+  example.  The certificate is split across the interface $x_1=1/2$, the
+  generator is uniformly negative, and sampled trajectories show both
+  $X_t$ and the stopped certificate process $V(X_{t\wedge\tau_K})$.}
+  \label{fig:pwq-2d-verification-example}
+\end{figure}
+
+Let
+\[
+  K=[0,1]\times[-1,1]\subset\mathbb R^2
+\]
+and consider the two-dimensional SDE
+\begin{equation}
+  dX_t=
+  \begin{pmatrix}1\\0\end{pmatrix}dt
+  +\sqrt{2}\,I_2\,dW_t.
+  \label{eq:example-2d-sde}
+\end{equation}
+Thus
+\[
+  f(x)=
+  \begin{pmatrix}1\\0\end{pmatrix},
+  \qquad
+  \sigma(x)=\sqrt{2}\,I_2,
+  \qquad
+  a(x)=\sigma(x)\sigma(x)^\top=2I_2.
+\]
+We split $K$ into the two cells
+\[
+  K_1=\{x\in K:x_1\leq 1/2\},
+  \qquad
+  K_2=\{x\in K:x_1\geq 1/2\}.
+\]
+Define the continuous piecewise-quadratic candidate
+\begin{equation}
+  V(x)=
+  \begin{cases}
+    V_1(x)=x_1-\dfrac34x_1^2,
+      &x\in K_1,\\[0.8em]
+    V_2(x)=\dfrac{5}{16}
+      +\dfrac{1}{10}\left(x_1-\dfrac12\right)
+      -\dfrac14\left(x_1-\dfrac12\right)^2,
+      &x\in K_2.
+  \end{cases}
+  \label{eq:example-2d-certificate}
+\end{equation}
+Equivalently, in the form
+\[
+  V_i(x)=c_i+p_i^\top x+\frac12x^\top Q_i x,
+\]
+the two pieces are
+\[
+  c_1=0,
+  \qquad
+  p_1=
+  \begin{pmatrix}1\\0\end{pmatrix},
+  \qquad
+  Q_1=
+  \begin{pmatrix}
+    -3/2&0\\
+    0&0
+  \end{pmatrix},
+\]
+and, after expanding $V_2$,
+\[
+  V_2(x)=\frac15+\frac{7}{20}x_1-\frac14x_1^2,
+\]
+so
+\[
+  c_2=\frac15,
+  \qquad
+  p_2=
+  \begin{pmatrix}7/20\\0\end{pmatrix},
+  \qquad
+  Q_2=
+  \begin{pmatrix}
+    -1/2&0\\
+    0&0
+  \end{pmatrix}.
+\]
+
+\subsection{Continuity across the interface}
+
+The only internal interface is
+\[
+  F=\{x\in K:x_1=1/2\}.
+\]
+On the left side,
+\[
+  V_1(1/2,x_2)
+  =
+  \frac12-\frac34\cdot\frac14
+  =
+  \frac{5}{16}.
+\]
+On the right side,
+\[
+  V_2(1/2,x_2)
+  =
+  \frac{5}{16}
+  +\frac{1}{10}\cdot0
+  -\frac14\cdot0
+  =
+  \frac{5}{16}.
+\]
+Thus $V_1=V_2$ on $F$, so $V$ is continuous.
+
+\subsection{Boundary conditions}
+
+Take
+\[
+  X_0=[0,1/20]\times[-1,1],
+  \qquad
+  X_u=[19/20,1]\times[-1,1],
+\]
+and choose
+\[
+  \alpha=\frac1{20},
+  \qquad
+  \beta=\frac14.
+\]
+Since $V_1'(x_1)=1-\frac32x_1>0$ on $[0,1/20]$,
+\[
+  \sup_{x\in X_0}V(x)
+  =
+  V_1(1/20,x_2)
+  =
+  \frac1{20}
+  -\frac34\cdot\frac1{400}
+  =
+  \frac{77}{1600}
+  <
+  \frac1{20}
+  =
+  \alpha.
+\]
+For the unsafe set, $V_2'(x_1)=\frac{7}{20}-\frac12x_1<0$ on
+$[19/20,1]$, so the minimum occurs at $x_1=1$:
+\[
+  \inf_{x\in X_u}V(x)
+  =
+  V_2(1,x_2)
+  =
+  \frac15+\frac{7}{20}-\frac14
+  =
+  \frac3{10}
+  >
+  \frac14
+  =
+  \beta.
+\]
+Therefore the boundary separation condition holds.
+
+\subsection{Generator condition}
+
+For the SDE \eqref{eq:example-2d-sde}, the generator is
+\[
+  \mathcal LV_i(x)
+  =
+  \nabla V_i(x)\cdot
+  \begin{pmatrix}1\\0\end{pmatrix}
+  +
+  \frac12\operatorname{tr}(2I_2Q_i)
+  =
+  \partial_{x_1}V_i(x)+\operatorname{tr}(Q_i).
+\]
+On $K_1$,
+\[
+  \nabla V_1(x)=
+  \begin{pmatrix}
+    1-\frac32x_1\\0
+  \end{pmatrix},
+  \qquad
+  \operatorname{tr}(Q_1)=-\frac32.
+\]
+Hence
+\[
+  \mathcal LV_1(x)
+  =
+  \left(1-\frac32x_1\right)-\frac32
+  =
+  -\frac12-\frac32x_1
+  \leq
+  -\frac12.
+\]
+On $K_2$,
+\[
+  \nabla V_2(x)=
+  \begin{pmatrix}
+    \frac{7}{20}-\frac12x_1\\0
+  \end{pmatrix},
+  \qquad
+  \operatorname{tr}(Q_2)=-\frac12.
+\]
+Therefore
+\[
+  \mathcal LV_2(x)
+  =
+  \left(\frac{7}{20}-\frac12x_1\right)-\frac12
+  =
+  -\frac{3}{20}-\frac12x_1.
+\]
+Since $x_1\geq1/2$ on $K_2$,
+\[
+  \mathcal LV_2(x)
+  \leq
+  -\frac{3}{20}-\frac14
+  =
+  -\frac25.
+\]
+Thus the generator condition holds on both cells with the uniform margin
+\[
+  \mathcal LV_i(x)\leq-\varepsilon,
+  \qquad
+  \varepsilon=\frac25.
+\]
+
+\subsection{Interface condition}
+
+Let the unit normal on $F$ pointing from $K_1$ to $K_2$ be
+\[
+  n_{1\to2}=
+  \begin{pmatrix}1\\0\end{pmatrix}.
+\]
+The interface condition requires
+\[
+  \left(p_2-p_1+(Q_2-Q_1)x\right)\cdot n_{1\to2}\leq0,
+  \qquad x\in F.
+\]
+Here
+\[
+  p_2-p_1=
+  \begin{pmatrix}
+    -13/20\\0
+  \end{pmatrix},
+  \qquad
+  Q_2-Q_1=
+  \begin{pmatrix}
+    1&0\\
+    0&0
+  \end{pmatrix}.
+\]
+Therefore, on $F$ where $x_1=1/2$,
+\[
+  \left(p_2-p_1+(Q_2-Q_1)x\right)\cdot n_{1\to2}
+  =
+  -\frac{13}{20}+\frac12
+  =
+  -\frac{3}{20}
+  <0.
+\]
+So the surface-local-time contribution in the multidimensional
+It\^o--Tanaka formula is nonpositive.
+
+\subsection{Martingale term}
+
+The stochastic integral is
+\[
+  M_t
+  =
+  \int_0^{t\wedge\tau_K}
+  \nabla V(X_s)^\top\sqrt{2}I_2\,dW_s.
+\]
+Since $K$ is compact and $V$ is piecewise quadratic with finitely many cells,
+$\nabla V$ is bounded on $K$. Hence, for each fixed $t$,
+\[
+  \mathbb E\left[
+    \int_0^{t\wedge\tau_K}
+    \left\|
+      \nabla V(X_s)^\top\sqrt{2}I_2
+    \right\|^2ds
+  \right]
+  <\infty,
+\]
+so $M_t$ is a true martingale.
+
+\subsection{Conclusion}
+
+All sufficient conditions from the multidimensional piecewise-quadratic
+argument hold:
+\begin{enumerate}
+  \item $V$ is continuous and piecewise quadratic on the polyhedral partition
+  $K=K_1\cup K_2$,
+  \item the boundary separation inequalities hold with
+  $\alpha=1/20$ and $\beta=1/4$,
+  \item the generator satisfies $\mathcal LV\leq-2/5$ on both cells,
+  \item the normal derivative jump across $F$ is $-3/20<0$,
+  \item the stopped stochastic integral is a martingale.
+\end{enumerate}
+Therefore
+\[
+  V(X_{t\wedge\tau_K})
+\]
+is a supermartingale. In particular, this gives a fully explicit two-dimensional
+verification example where the curvature term in the quadratic pieces
+compensates for the positive drift in the $x_1$ direction.
 
 \newpage
 
@@ -530,5 +858,16 @@ and it found some violations of the certificate conditions, as seen on Figure~\r
   \label{fig:trained-pwq-certificate-comparison}
 \end{figure}
 
+\section{Next steps}
+
+After feedback from Greg, I will work on the following next steps:
+\begin{enumerate}
+  \item Work through a concrete examples of 1D and 2D region discovery for a ReLU network,
+    to verify that the algorithms are correct and correctly implemented in the codebase.
+  \item Work through a concrete 2D SDE example with a piecewise-quadratic certificate and
+  add tests to the codebase to verify that the multidimensional verifier is correct.
+  \item Test edge cases in the multidimensional verifier like degenerate cells, empty cells,
+  points not fulfilling conditions on the corners of cells.
+\end{enumerate}
 
 \end{document}
