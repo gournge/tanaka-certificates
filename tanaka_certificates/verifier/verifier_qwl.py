@@ -205,6 +205,8 @@ class VerifierPiecewiseQuadratic(Verifier):
                 )
             )
 
+    # TODO: add test case for <= -delta
+    # TODO: add test where we check corners
     def _check_faces(self):
         domain = self.reach_avoid_problem.domain
         jump_failures = []
@@ -283,9 +285,7 @@ class VerifierPiecewiseQuadratic(Verifier):
 
 
 def _face_issue(kind, data, bound):
-    return VerificationIssue(
-        kind, data[1], data[0], bound, (data[2], data[3]), data[4]
-    )
+    return VerificationIssue(kind, data[1], data[0], bound, (data[2], data[3]), data[4])
 
 
 def _rectangle_polygon(rectangle):

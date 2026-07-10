@@ -6,9 +6,10 @@ Consider the Ornstein--Uhlenbeck process
 
 and a continuous piecewise linear certificate V with breakpoints -0.5, 0, and
 0.5.  All breakpoints are contained in the target [-1, 1], so the concavity
-condition on the kink term K_t does not need to be checked there.  On the
-sublevel set outside the target, the certificate is V(x) = |x|.  Since the
-curvature term vanishes on the interior of every linear piece, its generator is
+condition on the kink term K_t does not need to be checked there.  The initial
+set is outside the target, with V(initial) <= alpha = 1.5.  On the sublevel set
+outside the target, the certificate is V(x) = |x|.  Since the curvature term
+vanishes on the interior of every linear piece, its generator is
 
     L V(x) = V'(x) f(x) = -|x|.
 
@@ -19,13 +20,10 @@ for epsilon = 1.1.
 
 from unittest.mock import Mock
 
-import numpy as np
-
-from tanaka_certificates.facet import Breakpoint
-from tanaka_certificates.nn import create_1d_certificate_given_breakpoints
-from tanaka_certificates.ra import ReachAvoidProblem1D
-from tanaka_certificates.regions import Interval, IntervalUnion
-from tanaka_certificates.sde import OrnsteinUhlenbeck1D
+from tanaka_certificates.problems import (
+    ORNSTEIN_UHLENBECK_PWL_1D_CERTIFICATE_SETUP,
+    make_ornstein_uhlenbeck_pwl_1d_problem,
+)
 from tanaka_certificates.verifier import (
     VerificationResult,
     Verifier1DPiecewiseLinear,
@@ -33,26 +31,11 @@ from tanaka_certificates.verifier import (
 
 
 def make_ornstein_uhlenbeck_verifier(epsilon):
+    sde, problem = make_ornstein_uhlenbeck_pwl_1d_problem(epsilon=epsilon)
     return Verifier1DPiecewiseLinear(
-        sde=OrnsteinUhlenbeck1D(mean_reversion=1.0, volatility=1.0, long_term_mean=0.0),
-        certificate=create_1d_certificate_given_breakpoints(
-            [
-                Breakpoint(np.array([-0.5]), np.array([0.5])),
-                Breakpoint(np.array([0.0]), np.array([0.25])),
-                Breakpoint(np.array([0.5]), np.array([0.5])),
-            ],
-            -1.0,
-            1.0,
-        ),
-        reach_avoid_problem=ReachAvoidProblem1D(
-            domain=IntervalUnion([Interval(-2.0, 2.0)]),
-            initial=IntervalUnion([Interval(0.0, 0.0)]),
-            unsafe=IntervalUnion([Interval(-2.0, -2.0), Interval(2.0, 2.0)]),
-            target=IntervalUnion([Interval(-1.0, 1.0)]),
-            alpha=0.5,
-            beta=2.0,
-            epsilon=epsilon,
-        ),
+        sde=sde,
+        certificate=ORNSTEIN_UHLENBECK_PWL_1D_CERTIFICATE_SETUP.make_certificate(),
+        reach_avoid_problem=problem,
     )
 
 

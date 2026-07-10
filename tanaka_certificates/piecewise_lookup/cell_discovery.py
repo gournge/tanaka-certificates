@@ -1,8 +1,15 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
+from itertools import product
+
 import numpy as np
 from scipy.optimize import linprog
 
-from tanaka_certificates.nn.last_layer_activation import PiecewiseQuadratic1D
+from tanaka_certificates.nn.last_layer_activation import (
+    PiecewiseQuadratic1D,
+    get_relu_like_piecewise_quadratic_activation,
+)
 
 
 @dataclass
@@ -19,11 +26,11 @@ class Cell:
     """
 
     index: int
-    Q: "np.ndarray"
-    p: "np.ndarray"
+    Q: np.ndarray
+    p: np.ndarray
     c: float
-    A: "np.ndarray"
-    b: "np.ndarray"
+    A: np.ndarray
+    b: np.ndarray
 
     def contains(self, point: np.ndarray, *, atol: float = 1e-9) -> bool:
         """Return whether a point lies in this cell, including its boundary."""
@@ -33,219 +40,410 @@ class Cell:
         return bool(np.all(self.A @ point <= self.b + atol))
 
 
-def discover_cells_from_network_weights(
-    relu_network_weights: list[tuple[np.ndarray, np.ndarray]],
-    last_layer_piecewise_quadratic_activation: PiecewiseQuadratic1D,
-    *,
-    final_linear_has_relu: bool = True,
-) -> list[Cell]:
-    """Discover the cells K_i from the weights of the ReLU network and the last layer.
+@dataclass
+class _AffineRegion:
+    """Intermediate region on which the current layer is affine."""
 
-    Args:
-        relu_network_weights: The weights of the ReLU network.
-        last_layer_piecewise_quadratic_activation: The activation function of the last layer.
-    Returns:
-        A list of cells K_i, each with its associated quadratic piece of the certificate.
+    affine_matrix: np.ndarray
+    affine_bias: np.ndarray
+    A: np.ndarray
+    b: np.ndarray
+
+
+def _validate_piecewise_quadratic(
+    activation: PiecewiseQuadratic1D,
+) -> None:
+    number_of_pieces = len(activation.intervals)
+
+    if number_of_pieces == 0:
+        raise ValueError("piecewise-quadratic activation must have at least one piece")
+
+    if not (
+        len(activation.Qs)
+        == len(activation.ps)
+        == len(activation.cs)
+        == number_of_pieces
+    ):
+        raise ValueError("intervals, Qs, ps, and cs must all have the same length")
+
+    previous_upper = -np.inf
+
+    for index, interval in enumerate(activation.intervals):
+        if len(interval) != 2:
+            raise ValueError(
+                f"activation interval {index} must contain a lower and upper bound"
+            )
+
+        lower, upper = interval
+
+        if lower > upper:
+            raise ValueError(
+                f"activation interval {index} has lower bound greater than upper bound"
+            )
+
+        if lower > previous_upper:
+            raise ValueError(
+                "piecewise-quadratic activation does not cover the real line"
+            )
+
+        previous_upper = max(previous_upper, upper)
+
+    if activation.intervals[0][0] != -np.inf:
+        raise ValueError(
+            "piecewise-quadratic activation must cover inputs down to -inf"
+        )
+
+    if activation.intervals[-1][1] != np.inf:
+        raise ValueError("piecewise-quadratic activation must cover inputs up to inf")
+
+
+def _validate_network_weights(
+    relu_network_weights: list[tuple[np.ndarray, np.ndarray]],
+    lam: np.ndarray,
+) -> tuple[list[tuple[np.ndarray, np.ndarray]], np.ndarray, int]:
+    if not relu_network_weights:
+        raise ValueError("relu_network_weights must contain at least one layer")
+
+    validated_weights: list[tuple[np.ndarray, np.ndarray]] = []
+
+    previous_output_dimension: int | None = None
+    input_dimension: int | None = None
+
+    for layer_index, (W, b) in enumerate(relu_network_weights):
+        W = np.asarray(W, dtype=float)
+        b = np.asarray(b, dtype=float)
+
+        if W.ndim != 2:
+            raise ValueError(f"W at layer {layer_index} must be two-dimensional")
+
+        if b.ndim != 1:
+            raise ValueError(f"b at layer {layer_index} must be one-dimensional")
+
+        if W.shape[0] != b.shape[0]:
+            raise ValueError(
+                f"W and b at layer {layer_index} have incompatible shapes: "
+                f"{W.shape} and {b.shape}"
+            )
+
+        if previous_output_dimension is not None:
+            if W.shape[1] != previous_output_dimension:
+                raise ValueError(
+                    f"layer {layer_index} expects {W.shape[1]} inputs, "
+                    f"but the preceding layer produces "
+                    f"{previous_output_dimension} outputs"
+                )
+        else:
+            input_dimension = W.shape[1]
+
+        previous_output_dimension = W.shape[0]
+        validated_weights.append((W, b))
+
+    assert input_dimension is not None
+    assert previous_output_dimension is not None
+
+    lam = np.asarray(lam, dtype=float)
+
+    if lam.ndim != 1:
+        raise ValueError("lam must be one-dimensional")
+
+    if lam.shape[0] != previous_output_dimension:
+        raise ValueError(
+            "lam must have one entry for every output of the final affine layer; "
+            f"expected {previous_output_dimension}, got {lam.shape[0]}"
+        )
+
+    return validated_weights, lam, input_dimension
+
+
+def _has_full_dimensional_interior(
+    A: np.ndarray,
+    b: np.ndarray,
+    *,
+    dimension: int,
+    tolerance: float = 1e-9,
+) -> bool:
+    """Return whether ``A @ x <= b`` has nonempty full-dimensional interior.
+
+    The auxiliary variable ``margin`` maximizes the normalized distance from
+    every nonconstant boundary:
+
+        A_i @ x + ||A_i|| margin <= b_i.
+
+    A positive optimum means that a point satisfies all nonconstant
+    inequalities strictly.
     """
 
-    if not relu_network_weights:
-        raise ValueError("at least one ReLU layer is required")
+    A = np.asarray(A, dtype=float).reshape((-1, dimension))
+    b = np.asarray(b, dtype=float).reshape((-1,))
 
-    weights = _validate_relu_weights(relu_network_weights)
-    input_dimension = weights[0][0].shape[1]
-    if weights[-1][0].shape[0] != 1:
-        raise ValueError("the final ReLU layer must have scalar output")
-    activation = _validate_piecewise_quadratic_activation(
-        last_layer_piecewise_quadratic_activation
+    if A.shape[0] != b.shape[0]:
+        raise ValueError("A and b contain different numbers of constraints")
+
+    if A.shape[0] == 0:
+        return True
+
+    row_norms = np.linalg.norm(A, axis=1)
+    constant_rows = row_norms <= tolerance
+
+    # A zero-normal constraint is either always true (0 <= b) or impossible.
+    if np.any(b[constant_rows] < -tolerance):
+        return False
+
+    A = A[~constant_rows]
+    b = b[~constant_rows]
+    row_norms = row_norms[~constant_rows]
+
+    if A.shape[0] == 0:
+        return True
+
+    # Variables are [x_1, ..., x_n, margin].
+    augmented_A = np.column_stack((A, row_norms))
+
+    objective = np.zeros(dimension + 1)
+    objective[-1] = -1.0
+
+    # Capping the margin avoids an unbounded auxiliary LP without affecting
+    # whether a positive margin exists.
+    bounds = [(None, None)] * dimension + [(0.0, 1.0)]
+
+    result = linprog(
+        objective,
+        A_ub=augmented_A,
+        b_ub=b,
+        bounds=bounds,
+        method="highs",
     )
 
-    # Each state consists of the affine map z=A*x+d on one activation region and
-    # the halfspaces H*x+h >= 0 defining that region.
-    states = [
-        (
-            np.eye(input_dimension),
-            np.zeros(input_dimension),
-            np.empty((0, input_dimension)),
-            np.empty(0),
+    return bool(result.success and result.x is not None and result.x[-1] > tolerance)
+
+
+def _append_constraints(
+    A: np.ndarray,
+    b: np.ndarray,
+    additional_A: list[np.ndarray],
+    additional_b: list[float],
+    *,
+    dimension: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    if not additional_A:
+        return A.copy(), b.copy()
+
+    appended_A = np.asarray(additional_A, dtype=float).reshape((-1, dimension))
+    appended_b = np.asarray(additional_b, dtype=float)
+
+    if A.shape[0] == 0:
+        return appended_A, appended_b
+
+    return (
+        np.vstack((A, appended_A)),
+        np.concatenate((b, appended_b)),
+    )
+
+
+def _split_region_at_relu_layer(
+    region: _AffineRegion,
+    W: np.ndarray,
+    bias: np.ndarray,
+    *,
+    input_dimension: int,
+) -> list[_AffineRegion]:
+    """Split one affine region according to one ReLU layer."""
+
+    preactivation_matrix = W @ region.affine_matrix
+    preactivation_bias = W @ region.affine_bias + bias
+
+    number_of_units = W.shape[0]
+    child_regions: list[_AffineRegion] = []
+
+    for activation_pattern in product((False, True), repeat=number_of_units):
+        additional_A: list[np.ndarray] = []
+        additional_b: list[float] = []
+
+        for unit_index, active in enumerate(activation_pattern):
+            normal = preactivation_matrix[unit_index]
+            offset = preactivation_bias[unit_index]
+
+            if active:
+                # normal @ x + offset >= 0
+                additional_A.append(-normal)
+                additional_b.append(offset)
+            else:
+                # normal @ x + offset <= 0
+                additional_A.append(normal)
+                additional_b.append(-offset)
+
+        A, b = _append_constraints(
+            region.A,
+            region.b,
+            additional_A,
+            additional_b,
+            dimension=input_dimension,
+        )
+
+        if not _has_full_dimensional_interior(
+            A,
+            b,
+            dimension=input_dimension,
+        ):
+            continue
+
+        diagonal = np.diag(np.asarray(activation_pattern, dtype=float))
+
+        child_regions.append(
+            _AffineRegion(
+                affine_matrix=diagonal @ preactivation_matrix,
+                affine_bias=diagonal @ preactivation_bias,
+                A=A,
+                b=b,
+            )
+        )
+
+    return child_regions
+
+
+def discover_cells_from_network_weights(
+    relu_network_weights: list[tuple[np.ndarray, np.ndarray]],
+    lam: np.ndarray,
+    c: float,
+    piecewise_quadratic_activation: PiecewiseQuadratic1D | None = None,
+) -> list[Cell]:
+    """Discover full-dimensional quadratic cells of a ReLU network.
+
+    The last tuple in ``relu_network_weights`` is treated as an affine output
+    layer. ReLU is applied after every preceding layer.
+
+    On each discovered cell the returned polynomial has the form
+
+        x.T @ Q @ x + p.T @ x + c.
+
+    Lower-dimensional boundary-only activation patterns are not returned.
+    Adjacent cells nevertheless contain their shared boundaries because each
+    cell is represented using non-strict halfspace inequalities.
+    """
+
+    if piecewise_quadratic_activation is None:
+        piecewise_quadratic_activation = get_relu_like_piecewise_quadratic_activation()
+
+    _validate_piecewise_quadratic(piecewise_quadratic_activation)
+
+    weights, lam, input_dimension = _validate_network_weights(
+        relu_network_weights,
+        lam,
+    )
+
+    scalar_offset = float(c)
+
+    # Initially, the network input is the identity affine map x -> x.
+    regions = [
+        _AffineRegion(
+            affine_matrix=np.eye(input_dimension),
+            affine_bias=np.zeros(input_dimension),
+            A=np.empty((0, input_dimension)),
+            b=np.empty((0,)),
         )
     ]
-    tolerance = 1e-10
 
-    for layer_index, (weight, bias) in enumerate(weights):
-        next_states = []
-        for affine, offset, region_H, region_h in states:
-            preactivation_affine = weight @ affine
-            preactivation_offset = weight @ offset + bias
-            if layer_index == len(weights) - 1 and not final_linear_has_relu:
-                next_states.append(
-                    (
-                        preactivation_affine,
-                        preactivation_offset,
-                        region_H,
-                        region_h,
-                    )
+    # Every layer except the final layer is followed by ReLU.
+    for W, bias in weights[:-1]:
+        next_regions: list[_AffineRegion] = []
+
+        for region in regions:
+            next_regions.extend(
+                _split_region_at_relu_layer(
+                    region,
+                    W,
+                    bias,
+                    input_dimension=input_dimension,
                 )
-                continue
-            forced_inactive = (
-                np.linalg.norm(preactivation_affine, axis=1) <= tolerance
-            ) & (np.abs(preactivation_offset) <= tolerance)
+            )
 
-            # Split one neuron at a time and prune empty partial patterns
-            # immediately.  Enumerating product((False, True), repeat=width)
-            # performs 2**width LPs even though a width-w hyperplane
-            # arrangement in fixed input dimension has only polynomially many
-            # nonempty regions.
-            partial_patterns = [(region_H, region_h, [])]
-            for neuron in range(len(bias)):
-                next_patterns = []
-                for partial_H, partial_h, partial_active in partial_patterns:
-                    if forced_inactive[neuron]:
-                        next_patterns.append(
-                            (partial_H, partial_h, partial_active + [False])
-                        )
-                        continue
-                    for is_active in (False, True):
-                        sign = 1.0 if is_active else -1.0
-                        candidate_H = np.vstack(
-                            (partial_H, sign * preactivation_affine[neuron])
-                        )
-                        candidate_h = np.r_[
-                            partial_h, sign * preactivation_offset[neuron]
-                        ]
-                        if _has_full_dimensional_interior(candidate_H, candidate_h):
-                            next_patterns.append(
-                                (candidate_H, candidate_h, partial_active + [is_active])
-                            )
-                partial_patterns = next_patterns
-                if not partial_patterns:
-                    break
+        regions = next_regions
 
-            for candidate_H, candidate_h, active in partial_patterns:
-                mask = np.asarray(active, dtype=float)
-                next_states.append(
-                    (
-                        mask[:, None] * preactivation_affine,
-                        mask * preactivation_offset,
-                        candidate_H,
-                        candidate_h,
-                    )
-                )
-        states = next_states
-
+    final_W, final_bias = weights[-1]
     cells: list[Cell] = []
-    for affine, offset, region_H, region_h in states:
-        output_affine = affine[0]
-        output_offset = float(offset[0])
-        constant_output = np.linalg.norm(output_affine) <= tolerance
 
-        for interval_index, ((lower, upper), q, p, c) in enumerate(
-            zip(activation.intervals, activation.Qs, activation.ps, activation.cs)
+    number_of_outputs = final_W.shape[0]
+    number_of_pieces = len(piecewise_quadratic_activation.intervals)
+
+    for region in regions:
+        output_matrix = final_W @ region.affine_matrix
+        output_bias = final_W @ region.affine_bias + final_bias
+
+        for piece_indices in product(
+            range(number_of_pieces),
+            repeat=number_of_outputs,
         ):
-            if constant_output:
-                if not lower <= output_offset <= upper:
-                    continue
-                # At a shared breakpoint, use one piece only. For a continuous
-                # activation all adjacent pieces give the same constant value.
-                if any(
-                    previous_lower <= output_offset <= previous_upper
-                    for previous_lower, previous_upper in activation.intervals[
-                        :interval_index
-                    ]
-                ):
-                    continue
-                cell_H, cell_h = region_H, region_h
-            else:
-                extra_H = []
-                extra_h = []
-                if np.isfinite(lower):
-                    extra_H.append(output_affine)
-                    extra_h.append(output_offset - lower)
+            additional_A: list[np.ndarray] = []
+            additional_b: list[float] = []
+
+            for output_index, piece_index in enumerate(piece_indices):
+                lower, upper = piecewise_quadratic_activation.intervals[piece_index]
+                normal = output_matrix[output_index]
+                offset = output_bias[output_index]
+
                 if np.isfinite(upper):
-                    extra_H.append(-output_affine)
-                    extra_h.append(upper - output_offset)
-                cell_H = (
-                    np.vstack((region_H, np.asarray(extra_H))) if extra_H else region_H
+                    # normal @ x + offset <= upper
+                    additional_A.append(normal)
+                    additional_b.append(upper - offset)
+
+                if np.isfinite(lower):
+                    # normal @ x + offset >= lower
+                    additional_A.append(-normal)
+                    additional_b.append(offset - lower)
+
+            A, b = _append_constraints(
+                region.A,
+                region.b,
+                additional_A,
+                additional_b,
+                dimension=input_dimension,
+            )
+
+            if not _has_full_dimensional_interior(
+                A,
+                b,
+                dimension=input_dimension,
+            ):
+                continue
+
+            Q = np.zeros((input_dimension, input_dimension))
+            p = np.zeros(input_dimension)
+            cell_constant = scalar_offset
+
+            for output_index, piece_index in enumerate(piece_indices):
+                piece_Q = float(piecewise_quadratic_activation.Qs[piece_index])
+                piece_p = float(piecewise_quadratic_activation.ps[piece_index])
+                piece_c = float(piecewise_quadratic_activation.cs[piece_index])
+
+                affine_normal = output_matrix[output_index]
+                affine_offset = float(output_bias[output_index])
+                multiplier = float(lam[output_index])
+
+                Q += multiplier * piece_Q * np.outer(affine_normal, affine_normal)
+
+                p += (
+                    multiplier
+                    * (2.0 * piece_Q * affine_offset + piece_p)
+                    * affine_normal
                 )
-                cell_h = np.concatenate((region_h, extra_h)) if extra_h else region_h
-                if not _has_full_dimensional_interior(cell_H, cell_h):
-                    continue
+
+                cell_constant += multiplier * (
+                    piece_Q * affine_offset**2 + piece_p * affine_offset + piece_c
+                )
+
+            # Remove insignificant asymmetry introduced by floating-point
+            # arithmetic.
+            Q = 0.5 * (Q + Q.T)
 
             cells.append(
                 Cell(
                     index=len(cells),
-                    Q=q * np.outer(output_affine, output_affine),
-                    p=(2.0 * q * output_offset + p) * output_affine,
-                    c=float(q * output_offset**2 + p * output_offset + c),
-                    A=-cell_H.copy(),
-                    b=cell_h.copy(),
+                    Q=Q,
+                    p=p,
+                    c=float(cell_constant),
+                    A=A,
+                    b=b,
                 )
             )
+
     return cells
-
-
-def _validate_relu_weights(
-    layers: list[tuple[np.ndarray, np.ndarray]],
-) -> list[tuple[np.ndarray, np.ndarray]]:
-    validated = []
-    previous_width = None
-    for layer_index, (weight, bias) in enumerate(layers):
-        weight = np.asarray(weight, dtype=float)
-        bias = np.asarray(bias, dtype=float)
-        if weight.ndim != 2 or bias.ndim != 1 or weight.shape[0] != len(bias):
-            raise ValueError(
-                f"layer {layer_index} must have weight shape (out, in) "
-                "and bias shape (out,)"
-            )
-        if previous_width is not None and weight.shape[1] != previous_width:
-            raise ValueError(f"layer {layer_index} has an incompatible input width")
-        if not np.all(np.isfinite(weight)) or not np.all(np.isfinite(bias)):
-            raise ValueError(f"layer {layer_index} contains non-finite values")
-        validated.append((weight, bias))
-        previous_width = weight.shape[0]
-    return validated
-
-
-def _validate_piecewise_quadratic_activation(
-    activation: PiecewiseQuadratic1D,
-) -> PiecewiseQuadratic1D:
-    if not isinstance(activation, PiecewiseQuadratic1D):
-        raise TypeError("last-layer activation must be a PiecewiseQuadratic1D")
-    lengths = {
-        len(activation.intervals),
-        len(activation.Qs),
-        len(activation.ps),
-        len(activation.cs),
-    }
-    if lengths != {len(activation.intervals)} or not activation.intervals:
-        raise ValueError("intervals, Qs, ps, and cs must have the same nonzero length")
-
-    previous_upper = -np.inf
-    for index, ((lower, upper), q, p, c) in enumerate(
-        zip(activation.intervals, activation.Qs, activation.ps, activation.cs)
-    ):
-        if np.isnan(lower) or np.isnan(upper) or lower >= upper:
-            raise ValueError(f"activation interval {index} is invalid")
-        if lower < previous_upper:
-            raise ValueError("activation intervals must be sorted and non-overlapping")
-        if not np.all(np.isfinite([q, p, c])):
-            raise ValueError("activation coefficients must be finite")
-        previous_upper = upper
-    return activation
-
-
-def _has_full_dimensional_interior(H: np.ndarray, h: np.ndarray) -> bool:
-    """Return whether ``H*x+h >= 0`` contains an open input-space region."""
-    if len(H) == 0:
-        return True
-
-    dimension = H.shape[1]
-    # Maximize a common positive slack t.  Capping t avoids an unbounded LP.
-    A_ub = np.column_stack((-H, np.ones(len(H))))
-    result = linprog(
-        np.r_[np.zeros(dimension), -1.0],
-        A_ub=A_ub,
-        b_ub=h,
-        bounds=[(None, None)] * dimension + [(0.0, 1.0)],
-        method="highs",
-    )
-    return bool(result.success and result.x[-1] > 1e-9)

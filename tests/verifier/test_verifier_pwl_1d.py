@@ -12,6 +12,10 @@ from tanaka_certificates.verifier import (
     Verifier1DPiecewiseLinear,
 )
 from tanaka_certificates.nn import create_1d_certificate_given_breakpoints
+from tanaka_certificates.problems import (
+    BROWNIAN_PWL_1D_CERTIFICATE_SETUPS,
+    make_brownian_pwl_1d_problem,
+)
 from tanaka_certificates.ra import ReachAvoidProblem
 
 
@@ -36,88 +40,51 @@ def make_test_verifier(*, target=None, alpha=0.0, beta=1.0, generator_checker=No
 
 
 @pytest.mark.parametrize(
-    "bs,ls,rs,vr",
+    "setup,vr",
     [
         pytest.param(
-            [Breakpoint(np.array([0.0]), np.array([0.0]))],
-            1.0,
-            -1.0,
+            BROWNIAN_PWL_1D_CERTIFICATE_SETUPS[0],
             VerificationResult.NOT_VERIFIED,
             id="V(x)=-abs(x)",
         ),
         pytest.param(
-            [Breakpoint(np.array([0.0]), np.array([0.0]))],
-            1.0,
-            1.0,
+            BROWNIAN_PWL_1D_CERTIFICATE_SETUPS[1],
             VerificationResult.VERIFIED,
             id="V(x)=x",
         ),
         pytest.param(
-            [Breakpoint(np.array([0.0]), np.array([0.0]))],
-            -1.0,
-            1.0,
+            BROWNIAN_PWL_1D_CERTIFICATE_SETUPS[2],
             VerificationResult.NOT_VERIFIED,
             id="V(x)=abs(x)",
         ),
         pytest.param(
-            [
-                Breakpoint(np.array([0.0]), np.array([0.0])),
-                Breakpoint(np.array([1.0]), np.array([0.1])),
-            ],
-            1.0,
-            -1.0,
+            BROWNIAN_PWL_1D_CERTIFICATE_SETUPS[3],
             VerificationResult.NOT_VERIFIED,
             id="almost-a-trapezoid-with-slopes-1-0.1--1",
         ),  # without the safety conditions it would work
         pytest.param(
-            [
-                Breakpoint(np.array([0.0]), np.array([0.0])),
-                Breakpoint(np.array([1.0]), np.array([-0.1])),
-            ],
-            -1.0,
-            1.0,
+            BROWNIAN_PWL_1D_CERTIFICATE_SETUPS[4],
             VerificationResult.NOT_VERIFIED,
             id="almost-a-trapezoid-with-slopes--1--0.1-1",
         ),
         pytest.param(
-            [
-                Breakpoint(np.array([0.0]), np.array([0.0])),
-                Breakpoint(np.array([1.0]), np.array([-0.1])),
-                Breakpoint(np.array([2.0]), np.array([0.1])),
-            ],
-            1.0,
-            -1.0,
+            BROWNIAN_PWL_1D_CERTIFICATE_SETUPS[5],
             VerificationResult.NOT_VERIFIED,
             id="letter-M-concavity-violated-at-one-kink",
         ),
         pytest.param(
-            [
-                Breakpoint(np.array([0.0]), np.array([0.0])),
-                Breakpoint(
-                    np.array([200.0]), np.array([-1.0])
-                ),  # kink outside of domain
-            ],
-            1.0,
-            1.0,
+            BROWNIAN_PWL_1D_CERTIFICATE_SETUPS[6],
             VerificationResult.VERIFIED,
             id="bad-kink-outside-of-domain",
         ),
     ],
 )
-def test_verify_brownian_motion(bs, ls, rs, vr):
+def test_verify_brownian_motion(setup, vr):
+    sde, problem = make_brownian_pwl_1d_problem()
     v = Verifier1DPiecewiseLinear(
-        sde=BrownianMotion(),
-        certificate=create_1d_certificate_given_breakpoints(bs, ls, rs),
-        # TODO are the parameters of the reach-avoid problem correct?
-        reach_avoid_problem=ReachAvoidProblem(
-            domain=IntervalUnion([Interval(-100.0, 100.0)]),
-            initial=IntervalUnion([Interval(-1.5, -0.5)]),
-            unsafe=IntervalUnion([Interval(1.5, 2.0)]),
-            target=IntervalUnion([Interval(-2.0, -1.5)]),
-            alpha=-0.4,
-            beta=-0.02,
-            epsilon=0.0,  # note: this is a degenerate case, but we want to test the concavity condition here
-        ),
+        sde=sde,
+        certificate=setup.make_certificate(),
+        reach_avoid_problem=problem,
     )
 
     assert v.verify() == vr
@@ -264,33 +231,24 @@ def test_piece_discovery_failure_fails_closed():
 
 
 @pytest.mark.parametrize(
-    "bs,ls,rs",
+    "setup",
     [
         pytest.param(
-            [Breakpoint(np.array([0.0]), np.array([0.0]))],
-            1.0,
-            -1.0,
+            BROWNIAN_PWL_1D_CERTIFICATE_SETUPS[0],
             id="V(x)=-abs(x)",
         ),
         pytest.param(
-            [Breakpoint(np.array([0.0]), np.array([0.0]))],
-            -1.0,
-            1.0,
+            BROWNIAN_PWL_1D_CERTIFICATE_SETUPS[2],
             id="V(x)=abs(x)",
         ),
         pytest.param(
-            [
-                Breakpoint(np.array([0.0]), np.array([0.0])),
-                Breakpoint(np.array([1.0]), np.array([0.1])),
-            ],
-            1.0,
-            -1.0,
+            BROWNIAN_PWL_1D_CERTIFICATE_SETUPS[3],
             id="almost-a-trapezoid-with-slopes-1-0.1--1",
         ),
     ],
 )
-def test_verifier_finds_linear_pieces_correctly(bs, ls, rs):
-    c = create_1d_certificate_given_breakpoints(bs, ls, rs)
+def test_verifier_finds_linear_pieces_correctly(setup):
+    c = setup.make_certificate()
     # here the params don't really matter, we just need a valid reach-avoid problem to construct the verifier
     v = Verifier1DPiecewiseLinear(
         sde=BrownianMotion(),
@@ -306,11 +264,27 @@ def test_verifier_finds_linear_pieces_correctly(bs, ls, rs):
         ),
     )
 
-    points = sorted((float(b.get_breakpoint), float(b.get_value)) for b in bs)
-    pieces = [(-np.inf, points[0][0], ls, points[0][1] - ls * points[0][0])]
+    points = sorted(
+        (float(b.get_breakpoint), float(b.get_value)) for b in setup.breakpoints
+    )
+    pieces = [
+        (
+            -np.inf,
+            points[0][0],
+            setup.left_slope,
+            points[0][1] - setup.left_slope * points[0][0],
+        )
+    ]
     for (x0, y0), (x1, y1) in zip(points, points[1:]):
         slope = (y1 - y0) / (x1 - x0)
         pieces.append((x0, x1, slope, y0 - slope * x0))
-    pieces.append((points[-1][0], np.inf, rs, points[-1][1] - rs * points[-1][0]))
+    pieces.append(
+        (
+            points[-1][0],
+            np.inf,
+            setup.right_slope,
+            points[-1][1] - setup.right_slope * points[-1][0],
+        )
+    )
 
     assert np.allclose(v._find_linear_pieces(), pieces)
