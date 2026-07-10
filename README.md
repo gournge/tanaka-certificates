@@ -12,43 +12,21 @@ Development documentation can be accessed through the [`docs/dev/index.md`](docs
 
 ```
 .
-├── docs
-│   ├── dev
-│   │   └── index.md
-│   └── research
-│       ├── log
-│       │   ├── figures
-│       │   └── sections
-│       ├── pdf
-│       │   ├── research-log.pdf
-│       │   └── weekly-reports
-│       └── weekly-reports
-├── pyproject.toml
-├── README.md
-├── scripts
-│   ├── __init__.py
+├── docs/
+│   ├── dev/                    # Development documentation
 │   └── research/
-├── tanaka_certificates
-│   ├── artifacts.py
-│   ├── certificate.py
-│   ├── facet.py
-│   ├── __init__.py
-│   ├── nn
-│   │   └── __init__.py
-│   ├── ra.py
-│   ├── regions.py
-│   ├── sde
-│   │   ├── base.py
-│   │   ├── constant.py
-│   │   ├── __init__.py
-│   │   └── ornstein_uhlenbeck.py
-│   └── verifier.py
-├── tests
-│   ├── test_artifacts.py
-│   ├── test_nn.py
-│   ├── test_sde.py
-│   ├── test_verifier_ornstein_uhlenbeck.py
-│   └── test_verifier.py
+│       ├── log/                # Research-log TeX sources
+│       ├── weekly-reports/     # Weekly-report TeX sources and images
+│       └── pdf/                # Rendered research documents
+├── output/                     # Generated experiment artifacts
+├── scripts/                    # Plotting and research scripts
+├── tanaka_certificates/
+│   ├── nn/                     # Neural-certificate utilities
+│   ├── piecewise_lookup/       # Region discovery and piecewise functions
+│   ├── sde/                    # SDE models
+│   └── verifier/               # Certificate verifiers
+├── tests/
+├── pyproject.toml
 └── uv.lock
 ```
 
