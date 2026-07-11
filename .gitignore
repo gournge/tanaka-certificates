@@ -31,3 +31,5 @@ dist/
 
 # Generated experiment artifacts
 output/
+
+.vscode/
