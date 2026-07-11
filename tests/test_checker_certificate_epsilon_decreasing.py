@@ -1,6 +1,6 @@
 import pytest
 
-from tanaka_certificates.checker import CheckerCertificateEpsilonDecreasing
+from tanaka_certificates.generator_supremum import CheckerCertificateEpsilonDecreasing
 from tanaka_certificates.sde import OrnsteinUhlenbeck1D
 from tanaka_certificates.sde.constant import BrownianMotion
 

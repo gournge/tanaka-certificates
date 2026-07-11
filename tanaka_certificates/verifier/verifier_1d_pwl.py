@@ -11,7 +11,7 @@ import numpy as np
 from torch import nn
 
 from tanaka_certificates.certificate import Certificate1D
-from tanaka_certificates.checker import CheckerCertificateEpsilonDecreasing
+from tanaka_certificates.generator_supremum import CheckerCertificateEpsilonDecreasing
 from tanaka_certificates.ra import ReachAvoidProblem1D
 from tanaka_certificates.sde.base import SDE1D
 from tanaka_certificates.verifier.base import Verifier, VerificationResult
