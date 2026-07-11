@@ -1,17 +1,12 @@
-# Developer documentation
+# Development documentation
 
-The package provides small building blocks for experiments with one-dimensional
-stochastic differential equations and piecewise-linear Tanaka certificates.
+## Core components
 
-- [Usage](usage.md) shows how to simulate an SDE, build a certificate, and run
-  the verifier.
-- [Key abstractions](abstractions.md) explains how the main objects fit
-  together and records the verifier's current support boundary.
+* [Cell discovery](cell_discovery.md)
+* [Generator supremum tests](generator_supremum.md)
 
-From the repository root, install the development environment and run the test
-suite with:
+## Exact 2D PWQ verifier
 
-```bash
-uv sync --dev
-uv run pytest
-```
+* [Explicit Ornstein--Uhlenbeck example](verifier_pwq_2d/ornstein_uhlenbeck.md)
+* [Interface concavity examples](verifier_pwq_2d/interface_concavity.md)
+* [Generator inequality examples](verifier_pwq_2d/generator_inequality.md)

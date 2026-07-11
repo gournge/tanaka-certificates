@@ -1,5 +1,10 @@
 # Tanaka certificates
 
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.14-blue?style=flat-square)
+![uv](https://img.shields.io/badge/managed%20with-uv-2b0231?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-pytest-informational?style=flat-square)
+<!-- ![Coverage](https://img.shields.io/badge/coverage-local%20only-lightgrey?style=flat-square) -->
+
 This repository explores extending the framework of Neural Continuous-Time Supermartingale Certificates [1] to the case of *piecewise* twice continously-differentiable certificates, rather than twice continously-differentiable certificates. This requires using the Itô-Tanaka-Meyer formula, which accounts for *kinks* and the infinitesimal time spent at these kinks.
 
 It is supervised by Grigory Neustroev, and is a part of Filip Morawiec's 2026 Summer Research Programme at the University of Birmingham in the topic of AI Safety, within the lab of Prof. Mirco Giacobbe.
@@ -12,43 +17,34 @@ Development documentation can be accessed through the [`docs/dev/index.md`](docs
 
 ```
 .
-├── docs
-│   ├── dev
-│   │   └── index.md
-│   └── research
-│       ├── log
-│       │   ├── figures
-│       │   └── sections
-│       ├── pdf
-│       │   ├── research-log.pdf
-│       │   └── weekly-reports
-│       └── weekly-reports
-├── pyproject.toml
-├── README.md
-├── scripts
-│   ├── __init__.py
+├── .github/
+│   └── workflows/             # GitHub Actions configuration
+├── docs/
+│   ├── dev/                    # Development notes and verifier documentation
+│   │   ├── img/                # Images used by development docs
+│   │   └── verifier_pwq_2d/    # Piecewise-quadratic verifier notes
 │   └── research/
-├── tanaka_certificates
-│   ├── artifacts.py
-│   ├── certificate.py
-│   ├── facet.py
-│   ├── __init__.py
-│   ├── nn
-│   │   └── __init__.py
-│   ├── ra.py
-│   ├── regions.py
-│   ├── sde
-│   │   ├── base.py
-│   │   ├── constant.py
-│   │   ├── __init__.py
-│   │   └── ornstein_uhlenbeck.py
-│   └── verifier.py
-├── tests
-│   ├── test_artifacts.py
-│   ├── test_nn.py
-│   ├── test_sde.py
-│   ├── test_verifier_ornstein_uhlenbeck.py
-│   └── test_verifier.py
+│       ├── pdf/                # Rendered research log and weekly reports
+│       ├── log/                # Research-log TeX sources
+│       └── weekly-reports/     # Weekly-report TeX sources and images
+├── output/                     # Generated experiment artifacts
+├── scripts/
+│   ├── research/               # Research-log plot generation scripts
+│   └── plot_*.py               # Plotting and visualization scripts
+├── tanaka_certificates/
+│   ├── nn/                     # Neural-certificate training utilities
+│   ├── sde/                    # Stochastic differential equation models
+│   ├── verifier/               # PWL and PWQ certificate verifiers
+│   ├── cell_discovery.py       # Cell discovery for piecewise networks
+│   ├── certificate.py          # Certificate abstractions
+│   ├── checker.py              # Certificate checking routines
+│   ├── problems.py             # Problem definitions
+│   └── regions.py              # Region and geometry utilities
+├── tests/
+│   ├── nn/                     # Neural-certificate tests
+│   ├── verifier/               # Verifier tests
+│   └── test_cell_discovery.py  # Cell-discovery tests
+├── pyproject.toml
 └── uv.lock
 ```
 
@@ -70,8 +66,14 @@ timestamp and Git revision, such as
 
 ### Compiling TeX files
 
-Install a TeX distribution that includes `latexmk`, then run the following
-commands from the repository root.
+Install a TeX distribution that includes `latexmk` and `listings`. On Debian
+or Ubuntu, these are provided by:
+
+```bash
+sudo apt install latexmk texlive-latex-recommended
+```
+
+Then run the following commands from the repository root.
 
 To compile the research log:
 

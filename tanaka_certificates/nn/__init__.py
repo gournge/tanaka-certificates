@@ -1,11 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import torch
 from torch import nn
-from tanaka_certificates.facet import Facet, Breakpoint
+import numpy as np
+
 from tanaka_certificates.certificate import Certificate
 
-
-def create_certificate_given_facets(facets: dict[Facet, float]) -> Certificate:
-    raise NotImplementedError("This function is not yet implemented.")
+if TYPE_CHECKING:
+    from tanaka_certificates.cell_discovery import Cell
 
 
 def _make_pwl_relu_network(xs, ys, L=4, dtype=torch.float64):
@@ -128,65 +132,36 @@ def _make_pwl_relu_network(xs, ys, L=4, dtype=torch.float64):
     return nn.Sequential(*layers)
 
 
-def create_1d_certificate_given_breakpoints(
-    breakpoints: list[Breakpoint],
-    leftmost_slope: float,
-    rightmost_slope: float,
-) -> Certificate:
-    """
-    Since every `Breakpoint` just represents a pair
+def create_1d_certificate_given_cells(cells: list[Cell]) -> Certificate:
+    """Construct a continuous PWL certificate from affine 1D cells."""
+    if len(cells) < 2:
+        raise ValueError("at least two cells are required")
+    ordered = sorted(cells, key=lambda cell: cell.interval_bounds()[0])
+    pieces = []
+    for cell in ordered:
+        if cell.Q.shape != (1, 1) or not np.allclose(cell.Q, 0.0):
+            raise ValueError("every cell must be one-dimensional and affine")
+        lower, upper = cell.interval_bounds()
+        pieces.append((lower, upper, float(cell.p[0]), float(cell.c)))
 
-    >>> (x_i, V(x_i)): tuple[float, float]
+    if not np.isneginf(pieces[0][0]) or not np.isposinf(pieces[-1][1]):
+        raise ValueError("cells must cover the real line")
+    xs = []
+    ys = []
+    for left, right in zip(pieces, pieces[1:]):
+        boundary = left[1]
+        if not np.isfinite(boundary) or not np.isclose(boundary, right[0]):
+            raise ValueError("cells must be contiguous and non-overlapping")
+        left_value = left[2] * boundary + left[3]
+        right_value = right[2] * boundary + right[3]
+        if not np.isclose(left_value, right_value):
+            raise ValueError("certificate cells must agree on shared boundaries")
+        xs.append(boundary)
+        ys.append((left_value + right_value) / 2.0)
 
-    it should correspond to a neural network which is piecewise linear with
-    breakpoints at x_i and values V(x_i) at those breakpoints.
-    Additionally, the neural network should have the specified slopes away
-    from the leftmost and rightmost breakpoints.
-
-    >>> c = create_1d_certificate_given_breakpoints(
-        breakpoints=[
-            Breakpoint(np.array([0.0]), np.array([1.0])),
-            Breakpoint(np.array([1.0]), np.array([2.0]))
-        ],
-        leftmost_slope=0.0,
-        rightmost_slope=0.0
-    )
-    >>> c.forward(torch.tensor([[-1.0], [0.0], [0.5], [1.0], [2.0]]))
-    ... tensor([[1.0000],
-                [1.0000],
-                [1.5000],
-                [2.0000],
-                [2.0000]])
-
-    Plot:
-    >>>       ____
-    >>>      /
-    >>> ____/
-
-    """
-    if not breakpoints:
-        raise ValueError("At least one breakpoint is required.")
-
-    points = sorted(
-        (
-            (float(breakpoint.get_breakpoint), float(breakpoint.get_value))
-            for breakpoint in breakpoints
-        ),
-        key=lambda point: point[0],
-    )
-    xs = [point[0] for point in points]
-    ys = [point[1] for point in points]
-
-    if len(xs) > 1 and any(left == right for left, right in zip(xs, xs[1:])):
-        raise ValueError("Breakpoints must have distinct coordinates.")
-
-    # Give the generic PWL constructor one auxiliary knot on either side.  Its
-    # linear extrapolation then has the requested exterior slopes, while the
-    # supplied breakpoints remain the knots of the certificate itself.
+    # Auxiliary knots preserve the exterior affine pieces during extrapolation.
     xs = [xs[0] - 1.0, *xs, xs[-1] + 1.0]
-    ys = [ys[0] - leftmost_slope, *ys, ys[-1] + rightmost_slope]
-    network = _make_pwl_relu_network(
-        xs, ys, L=4, dtype=torch.get_default_dtype()
-    )
+    ys = [ys[0] - pieces[0][2], *ys, ys[-1] + pieces[-1][2]]
+    network = _make_pwl_relu_network(xs, ys, L=4, dtype=torch.get_default_dtype())
 
     return Certificate(*network.children()).requires_grad_(False)
