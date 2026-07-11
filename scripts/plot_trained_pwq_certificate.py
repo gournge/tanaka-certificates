@@ -22,7 +22,6 @@ from tanaka_certificates.ra import ReachAvoidProblem
 from tanaka_certificates.sde import EulerMaruyama, IsotropicOrnsteinUhlenbeck
 from tanaka_certificates.verifier import (
     IssueKind,
-    QuadraticForm,
     VerifierPiecewiseQuadratic,
 )
 
@@ -34,20 +33,6 @@ REGION_STYLE = {
     "target": ("#52a76b", "#236b38", "Target"),
     "unsafe": ("#d95c5c", "#8f2020", "Unsafe"),
 }
-
-
-class _OUGeneratorBounder:
-    def __init__(self, sde):
-        self.sde = sde
-
-    def generator_on(self, cell):
-        rate = self.sde.mean_reversion
-        mean = np.full(self.sde.state_dim, self.sde.long_term_mean)
-        return QuadraticForm(
-            Q=-2.0 * rate * cell.Q,
-            p=2.0 * rate * cell.Q @ mean - rate * cell.p,
-            c=float(rate * cell.p @ mean + self.sde.volatility**2 * np.trace(cell.Q)),
-        )
 
 
 def make_default_training_configuration(
@@ -366,7 +351,6 @@ def plot_trained_pwq_certificate(
         sde,
         problem,
         certificate,
-        generator_bounder=_OUGeneratorBounder(sde),
     )
     verification_result = verifier.verify()
     cells = verifier.cells

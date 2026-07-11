@@ -13,7 +13,7 @@ from tanaka_certificates.nn.last_layer_activation import (
     PiecewiseQuadratic1D,
     get_relu_like_piecewise_quadratic_activation,
 )
-from tanaka_certificates.piecewise_lookup.cell_discovery import (
+from tanaka_certificates.cell_discovery import (
     Cell,
     discover_cells_from_network_weights,
 )
@@ -22,7 +22,7 @@ from tanaka_certificates.piecewise_lookup.cell_discovery import (
 DEFAULT_OUTPUT = Path("output")
 
 # The current values intentionally mirror
-# tests/piecewise_lookup/test_cell_discovery.py. They live here as well so the
+# tests/test_cell_discovery.py. They live here as well so the
 # plotting script remains standalone and the test continues to specify its own
 # example explicitly.
 CURRENT_W1 = np.array(

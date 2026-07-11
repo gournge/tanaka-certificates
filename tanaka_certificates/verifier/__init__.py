@@ -3,7 +3,6 @@ from .verifier_1d_pwl import Verifier1DPiecewiseLinear
 from .verifier_qwl import (
     IssueKind,
     QuadraticForm,
-    QuadraticGeneratorBounder,
     VerificationIssue,
     VerifierPiecewiseQuadratic,
 )
@@ -18,5 +17,4 @@ __all__ = [
     "VerificationIssue",
     "VerifierPiecewiseQuadraticNumerical",
     "QuadraticForm",
-    "QuadraticGeneratorBounder",
 ]

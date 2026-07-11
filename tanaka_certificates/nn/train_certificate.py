@@ -74,7 +74,6 @@ def train_pwq_certificate_baseline(
         nn.Linear(config.hidden_width, 1, dtype=dtype),
         PiecewiseQuadraticActivation(activation),
     )
-    certificate._final_linear_has_relu = False
     optimizer = torch.optim.Adam(certificate.parameters(), lr=config.learning_rate)
     history: dict[int, PiecewiseQuadraticCertificate] = {}
     final_losses: dict[str, float] = {}

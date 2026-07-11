@@ -31,21 +31,26 @@ outside the target.  Cell/sublevel intersections are resolved by adaptive
 polygon subdivision.  If a quadratic boundary cannot be separated within the
 configured depth, the verifier returns ``UNKNOWN`` rather than sampling.
 
-Dynamics enter through :class:`QuadraticGeneratorBounder`; concrete dynamics
-implementations live with their applications. Arithmetic uses floating-point
+The generator form is derived from the SDE and certificate cell in
+``tanaka_certificates.generator_supremum``. Arithmetic uses floating-point
 tolerances, so this is a sound algorithmic decomposition rather than a formally
 rounded theorem prover.
 """
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol
 
 import numpy as np
 
 from tanaka_certificates.certificate import PiecewiseQuadraticCertificate
-from tanaka_certificates.piecewise_lookup import PiecewiseQuadraticLookupBaseline
-from tanaka_certificates.piecewise_lookup.cell_discovery import Cell
+from tanaka_certificates.cell_discovery import (
+    Cell,
+    discover_cells_from_certificate,
+)
+from tanaka_certificates.generator_supremum import (
+    QuadraticForm,
+    check_supremum_of_generator_on_cell_below_eps,
+)
 from tanaka_certificates.ra import ReachAvoidProblem
 from tanaka_certificates.regions import Hyperrectangle
 from tanaka_certificates.sde.base import SDEND
@@ -78,23 +83,6 @@ class VerificationIssue:
         )
 
 
-@dataclass(frozen=True)
-class QuadraticForm:
-    Q: np.ndarray
-    p: np.ndarray
-    c: float
-
-    def value(self, point: np.ndarray) -> float:
-        return float(point @ self.Q @ point + self.p @ point + self.c)
-
-
-class QuadraticGeneratorBounder(Protocol):
-    """Abstraction boundary for certified dynamics backends (including LiRPA)."""
-
-    def generator_on(self, cell: Cell) -> QuadraticForm:
-        """Return the exact quadratic ``L V_i`` on one certificate cell."""
-
-
 class VerifierPiecewiseQuadratic(Verifier):
     """Exact polygon/quadratic verifier for 2D PWQ certificates."""
 
@@ -103,9 +91,7 @@ class VerifierPiecewiseQuadratic(Verifier):
         sde: SDEND,
         reach_avoid_problem: ReachAvoidProblem,
         certificate: PiecewiseQuadraticCertificate,
-        piecewise_lookup: PiecewiseQuadraticLookupBaseline | None = None,
         *,
-        generator_bounder: QuadraticGeneratorBounder,
         tolerance: float = 1e-8,
         sublevel_max_depth: int = 12,
     ):
@@ -114,22 +100,17 @@ class VerifierPiecewiseQuadratic(Verifier):
             raise ValueError("the exact PWQ baseline currently supports 2D SDEs")
         if not isinstance(reach_avoid_problem.domain, Hyperrectangle):
             raise TypeError("the verification domain must be a Hyperrectangle")
-        self.piecewise_lookup = piecewise_lookup or PiecewiseQuadraticLookupBaseline(
-            certificate, sde
-        )
-        self.generator_bounder = generator_bounder
+        self.cells = discover_cells_from_certificate(certificate)
         self.tolerance = tolerance
         if sublevel_max_depth < 0:
             raise ValueError("sublevel_max_depth must be nonnegative")
         self.sublevel_max_depth = sublevel_max_depth
         self._unresolved = False
         self.issues: list[VerificationIssue] = []
-        self.cells: list[Cell] = []
 
     def verify(self) -> VerificationResult:
         self.issues = []
         self._unresolved = False
-        self.cells = self.piecewise_lookup.get_cells()
         problem = self.reach_avoid_problem
         self._check_region(
             problem.initial, IssueKind.INITIAL, problem.alpha, maximum=True
@@ -182,21 +163,22 @@ class VerifierPiecewiseQuadratic(Verifier):
                 polygon = _cell_rectangle_polygon(cell, rectangle, self.tolerance)
                 if len(polygon) < 3:
                     continue
-                objective = self.generator_bounder.generator_on(cell)
-                result, unresolved = _sublevel_quadratic_maximum(
-                    objective,
-                    QuadraticForm(cell.Q, cell.p, cell.c),
-                    beta,
-                    -self.reach_avoid_problem.epsilon,
-                    polygon,
-                    self.sublevel_max_depth,
-                    self.tolerance,
+                point, value, upper_bound = (
+                    check_supremum_of_generator_on_cell_below_eps(
+                        cell,
+                        self.sde,
+                        self.reach_avoid_problem.epsilon,
+                        polygon=polygon,
+                        beta=beta,
+                        max_depth=self.sublevel_max_depth,
+                        tolerance=self.tolerance,
+                    )
                 )
-                self._unresolved |= unresolved
-                candidates = [] if result is None else [result]
-                for value, point in candidates:
-                    if worst is None or value > worst[0]:
-                        worst = value, point, cell.index
+                self._unresolved |= upper_bound > (
+                    -self.reach_avoid_problem.epsilon + self.tolerance
+                ) and point is None
+                if point is not None and (worst is None or value > worst[0]):
+                    worst = value, point, cell.index
         bound = -self.reach_avoid_problem.epsilon
         if worst is not None and worst[0] > bound + self.tolerance:
             self.issues.append(
@@ -299,6 +281,17 @@ def _cell_rectangle_polygon(cell, rectangle, tolerance):
         polygon = _clip_polygon(polygon, normal, bound, tolerance)
         if len(polygon) == 0:
             break
+    if len(polygon) >= 3:
+        twice_area = abs(
+            float(
+                np.sum(
+                    polygon[:, 0] * np.roll(polygon[:, 1], -1)
+                    - polygon[:, 1] * np.roll(polygon[:, 0], -1)
+                )
+            )
+        )
+        if twice_area <= tolerance:
+            return np.empty((0, 2))
     return polygon
 
 
@@ -412,67 +405,6 @@ def _quadratic_sublevel_parameter_intervals(form, segment, beta, intervals, tole
             if lower <= upper + tolerance:
                 result.append((max(0.0, lower), min(1.0, upper)))
     return result
-
-
-def _sublevel_quadratic_maximum(
-    objective, level_form, beta, required_upper, polygon, max_depth, tolerance
-):
-    """Bound ``max objective`` on ``polygon intersect {level_form <= beta}``.
-
-    Every pruning decision uses exact polygon extrema.  A returned point is an
-    actual feasible maximizer of one fully-sublevel polygon.  ``unresolved``
-    means a mixed polygon survived to ``max_depth`` with an objective upper
-    bound that could still violate the requirement.
-    """
-    if np.linalg.norm(level_form.Q, ord=np.inf) <= tolerance:
-        clipped = _clip_polygon(polygon, level_form.p, beta - level_form.c, tolerance)
-        if len(clipped) < 3:
-            return None, False
-        maximum = _quadratic_extreme(objective, clipped, True, tolerance)
-        return (maximum if maximum[0] > required_upper + tolerance else None), False
-    best = None
-    unresolved = False
-    stack = [(polygon, 0)]
-    while stack:
-        current, depth = stack.pop()
-        level_min = _quadratic_extreme(level_form, current, False, tolerance)[0]
-        if level_min > beta + tolerance:
-            continue
-        objective_max = _quadratic_extreme(objective, current, True, tolerance)
-        if objective_max[0] <= required_upper + tolerance:
-            continue
-        level_max = _quadratic_extreme(level_form, current, True, tolerance)[0]
-        if level_max <= beta + tolerance:
-            if best is None or objective_max[0] > best[0]:
-                best = objective_max
-            continue
-        if level_form.value(objective_max[1]) <= beta + tolerance:
-            if best is None or objective_max[0] > best[0]:
-                best = objective_max
-        if depth >= max_depth:
-            unresolved = True
-            continue
-        children = _bisect_polygon(current, tolerance)
-        if len(children) < 2:
-            unresolved = True
-        else:
-            stack.extend((child, depth + 1) for child in children)
-    return best, unresolved
-
-
-def _bisect_polygon(polygon, tolerance):
-    lower, upper = polygon.min(axis=0), polygon.max(axis=0)
-    axis = int(np.argmax(upper - lower))
-    if upper[axis] - lower[axis] <= tolerance:
-        return []
-    midpoint = (lower[axis] + upper[axis]) / 2.0
-    normal = np.zeros(2)
-    normal[axis] = 1.0
-    children = (
-        _clip_polygon(polygon, normal, midpoint, tolerance),
-        _clip_polygon(polygon, -normal, -midpoint, tolerance),
-    )
-    return [child for child in children if len(child) >= 3]
 
 
 def _point_in_polygon(point, polygon, tolerance):

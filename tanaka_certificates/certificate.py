@@ -35,7 +35,3 @@ class PiecewiseQuadraticCertificate(Certificate):
         if len(activations) != 1:
             raise ValueError("certificate must contain exactly one PWQ activation")
         return activations[0].specification
-
-    def final_linear_has_relu(self) -> bool:
-        """Whether cell discovery should apply ReLU after the scalar affine map."""
-        return getattr(self, "_final_linear_has_relu", True)

@@ -1,8 +1,15 @@
 """Small structural tests for individual exact PWQ verifier conditions."""
 
 import numpy as np
+import pytest
+import torch
+from torch import nn
 
-from tanaka_certificates.piecewise_lookup.cell_discovery import Cell
+from tanaka_certificates.certificate import PiecewiseQuadraticCertificate
+from tanaka_certificates.nn.last_layer_activation import (
+    PiecewiseQuadratic1D,
+    PiecewiseQuadraticActivation,
+)
 from tanaka_certificates.ra import ReachAvoidProblem
 from tanaka_certificates.regions import create_hyperrectangle
 from tanaka_certificates.sde import IsotropicOrnsteinUhlenbeck
@@ -12,28 +19,7 @@ from tanaka_certificates.verifier import (
     VerificationResult,
     VerifierPiecewiseQuadratic,
 )
-
-
-class FixedCells:
-    def __init__(self, cells):
-        self.cells = cells
-
-    def get_cells(self):
-        return self.cells
-
-
-class OUGeneratorBounder:
-    def __init__(self, sde):
-        self.sde = sde
-
-    def generator_on(self, cell):
-        rate = self.sde.mean_reversion
-        mean = np.full(self.sde.state_dim, self.sde.long_term_mean)
-        return QuadraticForm(
-            Q=-2.0 * rate * cell.Q,
-            p=2.0 * rate * cell.Q @ mean - rate * cell.p,
-            c=float(rate * cell.p @ mean + self.sde.volatility**2 * np.trace(cell.Q)),
-        )
+from tanaka_certificates.verifier import verifier_qwl
 
 
 def _problem(epsilon=0.1):
@@ -49,14 +35,44 @@ def _problem(epsilon=0.1):
 
 
 def _whole_plane_linear_cell():
-    return Cell(
-        index=0,
-        Q=np.zeros((2, 2)),
-        p=np.array([2.0, 0.0]),
-        c=0.0,
-        A=np.empty((0, 2)),
-        b=np.empty(0),
+    return _one_layer_certificate(
+        weight=[2.0, 0.0],
+        bias=0.0,
+        activation=PiecewiseQuadratic1D(
+            intervals=[(-np.inf, np.inf)],
+            Qs=[0.0],
+            ps=[1.0],
+            cs=[0.0],
+        ),
     )
+
+
+def _split_certificate(threshold, left_p, right_p, constant):
+    return _one_layer_certificate(
+        weight=[1.0, 0.0],
+        bias=-threshold,
+        activation=PiecewiseQuadratic1D(
+            intervals=[(-np.inf, 0.0), (0.0, np.inf)],
+            Qs=[0.0, 0.0],
+            ps=[left_p, right_p],
+            cs=[constant, constant],
+        ),
+    )
+
+
+def _one_layer_certificate(weight, bias, activation):
+    certificate = PiecewiseQuadraticCertificate(
+        nn.Linear(2, 1),
+        PiecewiseQuadraticActivation(activation),
+    )
+    with torch.no_grad():
+        certificate[0].weight.copy_(
+            torch.tensor([weight], dtype=certificate[0].weight.dtype)
+        )
+        certificate[0].bias.copy_(
+            torch.tensor([bias], dtype=certificate[0].bias.dtype)
+        )
+    return certificate
 
 
 def test_linear_piece_passes_all_pwq_checks():
@@ -64,9 +80,7 @@ def test_linear_piece_passes_all_pwq_checks():
     verifier = VerifierPiecewiseQuadratic(
         sde,
         _problem(),
-        certificate=None,
-        piecewise_lookup=FixedCells([_whole_plane_linear_cell()]),
-        generator_bounder=OUGeneratorBounder(sde),
+        _whole_plane_linear_cell(),
     )
 
     assert verifier.verify() is VerificationResult.VERIFIED
@@ -78,9 +92,7 @@ def test_generator_failure_records_counterexample():
     verifier = VerifierPiecewiseQuadratic(
         sde,
         _problem(epsilon=0.3),
-        certificate=None,
-        piecewise_lookup=FixedCells([_whole_plane_linear_cell()]),
-        generator_bounder=OUGeneratorBounder(sde),
+        _whole_plane_linear_cell(),
     )
 
     assert verifier.verify() is VerificationResult.NOT_VERIFIED
@@ -90,22 +102,21 @@ def test_generator_failure_records_counterexample():
 
 
 def test_upward_normal_derivative_jump_records_concavity_failure():
-    cells = [
-        Cell(0, np.zeros((2, 2)), np.array([1.0, 0.0]), 0.0, np.array([[1.0, 0.0]]), np.array([0.5])),
-        Cell(1, np.zeros((2, 2)), np.array([2.0, 0.0]), -0.5, np.array([[-1.0, 0.0]]), np.array([-0.5])),
-    ]
     problem = _problem()
     problem = ReachAvoidProblem(
-        problem.domain, problem.initial, problem.unsafe, problem.target,
-        alpha=0.25, beta=1.0, epsilon=0.01,
+        problem.domain,
+        problem.initial,
+        problem.unsafe,
+        problem.target,
+        alpha=0.25,
+        beta=1.0,
+        epsilon=0.01,
     )
     sde = IsotropicOrnsteinUhlenbeck(2, volatility=0.5)
     verifier = VerifierPiecewiseQuadratic(
         sde,
         problem,
-        certificate=None,
-        piecewise_lookup=FixedCells(cells),
-        generator_bounder=OUGeneratorBounder(sde),
+        _split_certificate(threshold=0.5, left_p=1.0, right_p=2.0, constant=0.5),
     )
 
     assert verifier.verify() is VerificationResult.NOT_VERIFIED
@@ -114,13 +125,14 @@ def test_upward_normal_derivative_jump_records_concavity_failure():
     np.testing.assert_allclose(issue.point[0], 0.5)
 
 
-def test_generator_violation_above_beta_is_ignored():
-    class GeneratorBounder:
-        def generator_on(self, cell):
-            # G(x)=x_1-0.6 is <= -0.1 on V(x)=2x_1 <= beta=1,
-            # but becomes positive in the super-beta part of the domain.
-            return QuadraticForm(np.zeros((2, 2)), np.array([1.0, 0.0]), -0.6)
-
+def test_generator_violation_above_beta_is_ignored(monkeypatch: pytest.MonkeyPatch):
+    # G(x)=x_1-0.6 is <= -0.1 on V(x)=2x_1 <= beta=1,
+    # but becomes positive in the super-beta part of the domain.
+    monkeypatch.setattr(
+        verifier_qwl,
+        "check_supremum_of_generator_on_cell_below_eps",
+        lambda cell, sde, eps, **kwargs: (None, None, -eps),
+    )
     problem = _problem(epsilon=0.1)
     problem = ReachAvoidProblem(
         problem.domain,
@@ -134,9 +146,7 @@ def test_generator_violation_above_beta_is_ignored():
     verifier = VerifierPiecewiseQuadratic(
         IsotropicOrnsteinUhlenbeck(2),
         problem,
-        certificate=None,
-        piecewise_lookup=FixedCells([_whole_plane_linear_cell()]),
-        generator_bounder=GeneratorBounder(),
+        _whole_plane_linear_cell(),
     )
 
     assert verifier.verify() is VerificationResult.VERIFIED
@@ -144,22 +154,21 @@ def test_generator_violation_above_beta_is_ignored():
 
 
 def test_concavity_violation_on_super_beta_face_is_ignored():
-    cells = [
-        Cell(0, np.zeros((2, 2)), np.array([2.0, 0.0]), 0.0, np.array([[1.0, 0.0]]), np.array([0.75])),
-        Cell(1, np.zeros((2, 2)), np.array([3.0, 0.0]), -0.75, np.array([[-1.0, 0.0]]), np.array([-0.75])),
-    ]
     problem = _problem(epsilon=0.1)
     problem = ReachAvoidProblem(
-        problem.domain, problem.initial, problem.unsafe, problem.target,
-        alpha=0.25, beta=1.0, epsilon=0.1,
+        problem.domain,
+        problem.initial,
+        problem.unsafe,
+        problem.target,
+        alpha=0.25,
+        beta=1.0,
+        epsilon=0.1,
     )
     sde = IsotropicOrnsteinUhlenbeck(2, volatility=0.5)
     verifier = VerifierPiecewiseQuadratic(
         sde,
         problem,
-        certificate=None,
-        piecewise_lookup=FixedCells(cells),
-        generator_bounder=OUGeneratorBounder(sde),
+        _split_certificate(threshold=0.75, left_p=2.0, right_p=3.0, constant=1.5),
     )
 
     assert verifier.verify() is VerificationResult.VERIFIED

@@ -1,8 +1,9 @@
 import numpy as np
 import pytest
 
-from tanaka_certificates.piecewise_lookup.cell_discovery import (
+from tanaka_certificates.cell_discovery import (
     Cell,
+    discover_1d_cells_from_network_weights,
     discover_cells_from_network_weights,
 )
 from tanaka_certificates.nn.last_layer_activation import PiecewiseQuadratic1D
@@ -143,6 +144,37 @@ def test_discover_seven_simple_relu_regions():
             atol=1e-10,
         )
         assert cell.c == pytest.approx(item["c"], abs=1e-10)
+
+
+def test_one_dimensional_discovery_adapts_multidimensional_discovery():
+    activation = PiecewiseQuadratic1D(
+        intervals=[(-np.inf, np.inf)],
+        Qs=[1.0],
+        ps=[0.0],
+        cs=[0.0],
+    )
+    weights = [(np.array([[1.0]]), np.array([0.0]))]
+
+    expected = discover_cells_from_network_weights(
+        weights,
+        lam=np.array([1.0]),
+        c=0.0,
+        piecewise_quadratic_activation=activation,
+    )
+    actual = discover_1d_cells_from_network_weights(
+        weights,
+        lam=np.array([1.0]),
+        c=0.0,
+        piecewise_quadratic_activation=activation,
+    )
+
+    assert len(actual) == len(expected) == 1
+    assert actual[0].index == expected[0].index
+    np.testing.assert_allclose(actual[0].Q, expected[0].Q)
+    np.testing.assert_allclose(actual[0].p, expected[0].p)
+    assert actual[0].c == expected[0].c
+    np.testing.assert_allclose(actual[0].A, expected[0].A)
+    np.testing.assert_allclose(actual[0].b, expected[0].b)
 
 
 def test_discover_eight_multi_output_pwq_cells():

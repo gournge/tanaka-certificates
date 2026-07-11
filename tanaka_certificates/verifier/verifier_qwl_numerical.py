@@ -35,8 +35,9 @@ visualization.  See ``05-piecewise-quadratic-multidim.tex`` for the proof.
 import numpy as np
 
 from tanaka_certificates.certificate import PiecewiseQuadraticCertificate
-from tanaka_certificates.piecewise_lookup import PiecewiseQuadraticLookupBaseline
-from tanaka_certificates.piecewise_lookup.cell_discovery import Cell
+from tanaka_certificates.cell_discovery import (
+    discover_cells_from_certificate,
+)
 from tanaka_certificates.ra import ReachAvoidProblem
 from tanaka_certificates.regions import Hyperrectangle
 from tanaka_certificates.sde.base import SDEND
@@ -52,7 +53,6 @@ class VerifierPiecewiseQuadraticNumerical(Verifier):
         sde: SDEND,
         reach_avoid_problem: ReachAvoidProblem,
         certificate: PiecewiseQuadraticCertificate,
-        piecewise_lookup: PiecewiseQuadraticLookupBaseline | None = None,
         *,
         grid_resolution: int = 101,
         face_resolution: int = 101,
@@ -65,18 +65,14 @@ class VerifierPiecewiseQuadraticNumerical(Verifier):
             raise ValueError("verification resolutions must be at least 3")
         if not isinstance(reach_avoid_problem.domain, Hyperrectangle):
             raise TypeError("the verification domain must be a Hyperrectangle")
-        self.piecewise_lookup = piecewise_lookup or PiecewiseQuadraticLookupBaseline(
-            certificate, sde
-        )
+        self.cells = discover_cells_from_certificate(certificate)
         self.grid_resolution = grid_resolution
         self.face_resolution = face_resolution
         self.tolerance = tolerance
         self.issues: list[VerificationIssue] = []
-        self.cells: list[Cell] = []
 
     def verify(self) -> VerificationResult:
         self.issues = []
-        self.cells = self.piecewise_lookup.get_cells()
         problem = self.reach_avoid_problem
         self._check_region(problem.initial, IssueKind.INITIAL, problem.alpha, maximum=True)
         self._check_region(problem.unsafe, IssueKind.UNSAFE, problem.beta, maximum=False)

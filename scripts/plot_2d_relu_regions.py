@@ -8,7 +8,7 @@ from matplotlib.colors import ListedColormap
 import numpy as np
 
 from tanaka_certificates import ResultArtifact
-from tanaka_certificates.piecewise_lookup.cell_discovery import (
+from tanaka_certificates.cell_discovery import (
     Cell,
     PiecewiseQuadratic1D,
     discover_cells_from_network_weights,

@@ -29,7 +29,7 @@ x_1\\
 x_2\\
 x_1+x_2-\frac12
 \end{bmatrix},
-\qquad
+
 h(x)=\operatorname{ReLU}(a(x)).
 $$
 
@@ -37,16 +37,16 @@ The scalar affine output and PWQ activation are
 
 $$
 z(x)=h_1(x)+h_2(x)+h_3(x),
-\qquad
+
 \phi(z)=z^2,
-\qquad
+
 V(x)=z(x)^2.
 $$
 
 The hidden ReLU boundaries are therefore
 
 $$
-x_1=0,\qquad x_2=0,\qquad x_1+x_2=\frac12.
+x_1=0, x_2=0, x_1+x_2=\frac12.
 $$
 
 The two coordinate axes form four quadrants. The diagonal cannot intersect the
@@ -102,7 +102,7 @@ The multi-output regression example uses two inputs, two hidden ReLU units,
 and two outputs before the elementwise PWQ activation:
 
 $$
-h(x)=\operatorname{ReLU}(x),\qquad
+h(x)=\operatorname{ReLU}(x),
 z(x)=
 \begin{bmatrix}
 1&-1\\
@@ -197,11 +197,11 @@ Q=
 \begin{bmatrix}
 0.4&-0.4\\
 -0.4&0.4
-\end{bmatrix},\qquad
+\end{bmatrix},
 p=
 \begin{bmatrix}
 0.2\\-0.2
-\end{bmatrix},\qquad
+\end{bmatrix},
 c=0.55.
 $$
 

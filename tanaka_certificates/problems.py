@@ -4,8 +4,11 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from tanaka_certificates.facet import Breakpoint
-from tanaka_certificates.nn import create_1d_certificate_given_breakpoints
+from tanaka_certificates.cell_discovery import (
+    Cell,
+    create_1d_piecewise_linear_cells,
+)
+from tanaka_certificates.nn import create_1d_certificate_given_cells
 from tanaka_certificates.ra import ReachAvoidProblem, ReachAvoidProblem1D
 from tanaka_certificates.regions import (
     HyperrectangleUnion,
@@ -27,73 +30,51 @@ class PiecewiseLinear1DCertificateSetup:
 
     name: str
     description: str
-    breakpoints: tuple[Breakpoint, ...]
-    left_slope: float
-    right_slope: float
+    cells: tuple[Cell, ...]
 
     def make_certificate(self):
-        return create_1d_certificate_given_breakpoints(
-            list(self.breakpoints), self.left_slope, self.right_slope
-        )
+        return create_1d_certificate_given_cells(list(self.cells))
 
 
-def _breakpoint(x: float, value: float) -> Breakpoint:
-    return Breakpoint(np.array([x]), np.array([value]))
+def _pwl_cells(knots, left_slope, right_slope) -> tuple[Cell, ...]:
+    return tuple(create_1d_piecewise_linear_cells(knots, left_slope, right_slope))
 
 
 BROWNIAN_PWL_1D_CERTIFICATE_SETUPS = (
     PiecewiseLinear1DCertificateSetup(
         name="negative_absolute_value",
         description="V(x) = -abs(x)",
-        breakpoints=(_breakpoint(0.0, 0.0),),
-        left_slope=1.0,
-        right_slope=-1.0,
+        cells=_pwl_cells([(0.0, 0.0)], 1.0, -1.0),
     ),
     PiecewiseLinear1DCertificateSetup(
         name="identity",
         description="V(x) = x",
-        breakpoints=(_breakpoint(0.0, 0.0),),
-        left_slope=1.0,
-        right_slope=1.0,
+        cells=_pwl_cells([(0.0, 0.0)], 1.0, 1.0),
     ),
     PiecewiseLinear1DCertificateSetup(
         name="absolute_value",
         description="V(x) = abs(x)",
-        breakpoints=(_breakpoint(0.0, 0.0),),
-        left_slope=-1.0,
-        right_slope=1.0,
+        cells=_pwl_cells([(0.0, 0.0)], -1.0, 1.0),
     ),
     PiecewiseLinear1DCertificateSetup(
         name="almost_trapezoid_positive_middle",
         description="almost a trapezoid with slopes 1, 0.1, -1",
-        breakpoints=(_breakpoint(0.0, 0.0), _breakpoint(1.0, 0.1)),
-        left_slope=1.0,
-        right_slope=-1.0,
+        cells=_pwl_cells([(0.0, 0.0), (1.0, 0.1)], 1.0, -1.0),
     ),
     PiecewiseLinear1DCertificateSetup(
         name="almost_trapezoid_negative_middle",
         description="almost a trapezoid with slopes -1, -0.1, 1",
-        breakpoints=(_breakpoint(0.0, 0.0), _breakpoint(1.0, -0.1)),
-        left_slope=-1.0,
-        right_slope=1.0,
+        cells=_pwl_cells([(0.0, 0.0), (1.0, -0.1)], -1.0, 1.0),
     ),
     PiecewiseLinear1DCertificateSetup(
         name="letter_m",
         description="letter M with one concavity-violating kink",
-        breakpoints=(
-            _breakpoint(0.0, 0.0),
-            _breakpoint(1.0, -0.1),
-            _breakpoint(2.0, 0.1),
-        ),
-        left_slope=1.0,
-        right_slope=-1.0,
+        cells=_pwl_cells([(0.0, 0.0), (1.0, -0.1), (2.0, 0.1)], 1.0, -1.0),
     ),
     PiecewiseLinear1DCertificateSetup(
         name="bad_kink_outside_domain",
         description="bad kink outside the reach-avoid domain",
-        breakpoints=(_breakpoint(0.0, 0.0), _breakpoint(200.0, -1.0)),
-        left_slope=1.0,
-        right_slope=1.0,
+        cells=_pwl_cells([(0.0, 0.0), (200.0, -1.0)], 1.0, 1.0),
     ),
 )
 
@@ -101,13 +82,7 @@ BROWNIAN_PWL_1D_CERTIFICATE_SETUPS = (
 ORNSTEIN_UHLENBECK_PWL_1D_CERTIFICATE_SETUP = PiecewiseLinear1DCertificateSetup(
     name="ornstein_uhlenbeck_three_kink",
     description="three-kink OU certificate",
-    breakpoints=(
-        _breakpoint(-0.5, 0.5),
-        _breakpoint(0.0, 0.25),
-        _breakpoint(0.5, 0.5),
-    ),
-    left_slope=-1.0,
-    right_slope=1.0,
+    cells=_pwl_cells([(-0.5, 0.5), (0.0, 0.25), (0.5, 0.5)], -1.0, 1.0),
 )
 
 
@@ -198,6 +173,24 @@ def make_ou_problem(
         alpha=alpha,
         beta=2.0,
         epsilon=0.1,
+    )
+    return sde, problem
+
+
+def make_piecewise_quadratic_ou_2d_problem(
+) -> tuple[IsotropicOrnsteinUhlenbeck, ReachAvoidProblem]:
+    """Return a hand-verifiable two-cell PWQ Ornstein--Uhlenbeck problem."""
+    sde = IsotropicOrnsteinUhlenbeck(2, volatility=0.5)
+    problem = ReachAvoidProblem(
+        domain=create_hyperrectangle([0.0, -1.0], [1.0, 1.0]),
+        initial=create_hyperrectangle([0.3, -0.1], [0.4, 0.1]),
+        unsafe=HyperrectangleUnion(
+            create_hyperrectangle([0.9, -1.0], [1.0, 1.0]),
+        ),
+        target=create_hyperrectangle([0.0, -1.0], [0.1, 1.0]),
+        alpha=3.0 / 8.0,
+        beta=3.0 / 5.0,
+        epsilon=3.0 / 20.0,
     )
     return sde, problem
 

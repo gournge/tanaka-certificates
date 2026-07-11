@@ -7,7 +7,10 @@ from tanaka_certificates.sde.base import SDE
 
 class Verifier:
     def __init__(
-        self, sde: SDE, reach_avoid_problem: ReachAvoidProblem, certificate: Certificate
+        self,
+        sde: SDE,
+        reach_avoid_problem: ReachAvoidProblem,
+        certificate: Certificate | None,
     ):
         self.certificate = certificate
         self.reach_avoid_problem = reach_avoid_problem

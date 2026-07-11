@@ -4,14 +4,14 @@ from unittest.mock import Mock, call
 
 import numpy as np
 
-from tanaka_certificates.facet import Breakpoint
+from tanaka_certificates.cell_discovery import create_1d_piecewise_linear_cells
 from tanaka_certificates.regions import Interval, IntervalUnion
 from tanaka_certificates.sde.constant import BrownianMotion
 from tanaka_certificates.verifier import (
     VerificationResult,
     Verifier1DPiecewiseLinear,
 )
-from tanaka_certificates.nn import create_1d_certificate_given_breakpoints
+from tanaka_certificates.nn import create_1d_certificate_given_cells
 from tanaka_certificates.problems import (
     BROWNIAN_PWL_1D_CERTIFICATE_SETUPS,
     make_brownian_pwl_1d_problem,
@@ -23,8 +23,8 @@ def make_test_verifier(*, target=None, alpha=0.0, beta=1.0, generator_checker=No
     """Create a small valid verifier for focused tests."""
     return Verifier1DPiecewiseLinear(
         sde=BrownianMotion(),
-        certificate=create_1d_certificate_given_breakpoints(
-            [Breakpoint(np.array([0.0]), np.array([0.0]))], -1.0, -1.0
+        certificate=create_1d_certificate_given_cells(
+            create_1d_piecewise_linear_cells([(0.0, 0.0)], -1.0, -1.0)
         ),
         reach_avoid_problem=ReachAvoidProblem(
             domain=IntervalUnion([Interval(-10.0, 10.0)]),
@@ -105,13 +105,12 @@ def test_bad_kink_is_ignored_since_its_outside_of_domain():
     )
     v = Verifier1DPiecewiseLinear(
         sde=BrownianMotion(),
-        certificate=create_1d_certificate_given_breakpoints(
-            [
-                Breakpoint(np.array([0.0]), np.array([0.0])),
-                Breakpoint(np.array([200.0]), np.array([-1.0])),
-            ],
-            1.0,
-            1.0,  # upward slope jump at x=200: a bad kink
+        certificate=create_1d_certificate_given_cells(
+            create_1d_piecewise_linear_cells(
+                [(0.0, 0.0), (200.0, -1.0)],
+                1.0,
+                1.0,  # upward slope jump at x=200: a bad kink
+            )
         ),
         # TODO are the parameters of the reach-avoid problem correct?
         reach_avoid_problem=ReachAvoidProblem(
@@ -264,27 +263,9 @@ def test_verifier_finds_linear_pieces_correctly(setup):
         ),
     )
 
-    points = sorted(
-        (float(b.get_breakpoint), float(b.get_value)) for b in setup.breakpoints
-    )
     pieces = [
-        (
-            -np.inf,
-            points[0][0],
-            setup.left_slope,
-            points[0][1] - setup.left_slope * points[0][0],
-        )
+        (*cell.interval_bounds(), float(cell.p[0]), float(cell.c))
+        for cell in setup.cells
     ]
-    for (x0, y0), (x1, y1) in zip(points, points[1:]):
-        slope = (y1 - y0) / (x1 - x0)
-        pieces.append((x0, x1, slope, y0 - slope * x0))
-    pieces.append(
-        (
-            points[-1][0],
-            np.inf,
-            setup.right_slope,
-            points[-1][1] - setup.right_slope * points[-1][0],
-        )
-    )
 
     assert np.allclose(v._find_linear_pieces(), pieces)

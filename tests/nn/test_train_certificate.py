@@ -8,7 +8,9 @@ from tanaka_certificates.nn.train_certificate import (
     _sample_region,
     train_pwq_certificate_baseline,
 )
-from tanaka_certificates.piecewise_lookup import PiecewiseQuadraticLookupBaseline
+from tanaka_certificates.cell_discovery import (
+    discover_cells_from_certificate,
+)
 from tanaka_certificates.ra import ReachAvoidProblem
 from tanaka_certificates.regions import HyperrectangleUnion, create_hyperrectangle
 from tanaka_certificates.sde import IsotropicOrnsteinUhlenbeck
@@ -44,10 +46,9 @@ def test_training_baseline_returns_cell_discoverable_certificate():
     assert torch.isfinite(output).all()
     domain_points = torch.rand((256, 2)) * 2.0 - 1.0
     assert torch.all(certificate(domain_points) >= -1e-6)
-    assert len(certificate) == 14
-    assert not certificate.final_linear_has_relu()
+    assert len(certificate) == 10
     assert len(certificate.training_artifact.network_over_time) == 2
-    assert PiecewiseQuadraticLookupBaseline(certificate, sde).get_cells()
+    assert discover_cells_from_certificate(certificate)
 
 
 def test_training_is_reproducible_from_configuration_seed():

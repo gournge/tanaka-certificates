@@ -129,13 +129,9 @@ def _plot_certificate(axis, certificate, problem, pieces) -> None:
                 alpha=0.35,
             )
 
-    for breakpoint in ORNSTEIN_UHLENBECK_PWL_1D_CERTIFICATE_SETUP.breakpoints:
-        axis.axvline(
-            float(breakpoint.get_breakpoint),
-            color="#555555",
-            linewidth=0.9,
-            alpha=0.55,
-        )
+    for cell in ORNSTEIN_UHLENBECK_PWL_1D_CERTIFICATE_SETUP.cells[:-1]:
+        _, boundary = cell.interval_bounds()
+        axis.axvline(boundary, color="#555555", linewidth=0.9, alpha=0.55)
 
     axis.set(
         title="Certificate and verifier thresholds",
