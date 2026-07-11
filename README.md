@@ -24,8 +24,10 @@ Development documentation can be accessed through the [`docs/dev/index.md`](docs
 │   │   ├── img/                # Images used by development docs
 │   │   └── verifier_pwq_2d/    # Piecewise-quadratic verifier notes
 │   └── research/
-│       ├── pdf/                # Rendered research log and weekly reports
 │       ├── log/                # Research-log TeX sources
+│       │   ├── figures/        # Figures used by the research log
+│       │   └── sections/       # Research-log section TeX files
+│       ├── pdf/                # Rendered research log and weekly reports
 │       └── weekly-reports/     # Weekly-report TeX sources and images
 ├── output/                     # Generated experiment artifacts
 ├── scripts/
@@ -35,15 +37,18 @@ Development documentation can be accessed through the [`docs/dev/index.md`](docs
 │   ├── nn/                     # Neural-certificate training utilities
 │   ├── sde/                    # Stochastic differential equation models
 │   ├── verifier/               # PWL and PWQ certificate verifiers
+│   ├── artifacts.py            # Experiment artifact path helpers
 │   ├── cell_discovery.py       # Cell discovery for piecewise networks
 │   ├── certificate.py          # Certificate abstractions
-│   ├── checker.py              # Certificate checking routines
+│   ├── generator_supremum.py   # Generator supremum optimization helpers
 │   ├── problems.py             # Problem definitions
+│   ├── ra.py                   # Reach-avoid specification helpers
 │   └── regions.py              # Region and geometry utilities
 ├── tests/
 │   ├── nn/                     # Neural-certificate tests
 │   ├── verifier/               # Verifier tests
-│   └── test_cell_discovery.py  # Cell-discovery tests
+│   └── test_*.py               # Unit and integration tests
+├── .gitignore
 ├── pyproject.toml
 └── uv.lock
 ```
