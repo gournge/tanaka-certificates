@@ -93,6 +93,8 @@ def train_pwq_certificate_baseline(
         initial_loss = _upper_level_loss(
             certificate, initial, ras.alpha - config.constraint_margin
         )
+        # TODO: for now leave this, as the original Greg's paper had a minor issue,
+        # so we need to stick to reach-avoid problem with no target loss.
         # target_loss = _upper_level_loss(
         #     certificate, target, 0 - config.constraint_margin
         # )
