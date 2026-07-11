@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -11,7 +13,7 @@ def get_relu_like_piecewise_quadratic_activation() -> PiecewiseQuadratic1D:
     V(x) = (x+1)^2 / 4 for -1 < x < 1
     V(x) = x for x >= 1
 
-    Hence for $x \in [-1, 1]$:
+    Hence for $x \\in [-1, 1]$:
 
     $V(x) = \frac{1}{4} x^2 + \frac{1}{2} x + \frac{1}{4}$
     """
