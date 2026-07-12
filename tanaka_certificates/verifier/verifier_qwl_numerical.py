@@ -215,6 +215,12 @@ class VerifierPiecewiseQuadraticNumerical(Verifier):
         tangent = np.array([-normal[1], normal[0]])
         lower, upper = -np.inf, np.inf
         for row, bound in zip(A, b):
+            norm = float(np.linalg.norm(row))
+            if norm == 0.0:
+                if bound < 0.0:
+                    return None
+                continue
+            row, bound = row / norm, bound / norm
             coefficient = float(row @ tangent)
             remainder = float(bound - row @ origin)
             if abs(coefficient) <= self.tolerance:
