@@ -2,12 +2,12 @@ r"""Sound baseline verification of two-dimensional PWQ certificates.
 
 Cell discovery partitions the domain into convex polygons ``K_i`` and gives
 
-``V_i(x) = x.T Q_i x + p_i.T x + c_i``.
+``V_i(x) = c_i + p_i.T x + 1/2 x.T Q_i x``.
 
-Thus ``grad V_i = 2 Q_i x + p_i`` and ``Hess V_i = 2 Q_i``.  For the SDE
+Thus ``grad V_i = Q_i x + p_i`` and ``Hess V_i = Q_i``. For the SDE
 ``dX=f(X)dt+g(X)dW``,
 
-``L V_i = grad(V_i).T f + trace(g g.T Q_i)``.
+``L V_i = grad(V_i).T f + 1/2 trace(g g.T Q_i)``.
 
 A reach--avoid certificate satisfies ``sup_initial V <= alpha`` and
 ``inf_unsafe V >= beta``.  In every smooth cell, outside the target and in the
@@ -175,12 +175,12 @@ class VerifierPiecewiseQuadratic(Verifier):
                     )
                 )
                 self._unresolved |= upper_bound > (
-                    -self.reach_avoid_problem.epsilon + self.tolerance
+                    -self.reach_avoid_problem.epsilon
                 ) and point is None
                 if point is not None and (worst is None or value > worst[0]):
                     worst = value, point, cell.index
         bound = -self.reach_avoid_problem.epsilon
-        if worst is not None and worst[0] > bound + self.tolerance:
+        if worst is not None and worst[0] > bound:
             self.issues.append(
                 VerificationIssue(
                     IssueKind.GENERATOR, worst[1], worst[0], bound, (worst[2],)
@@ -242,8 +242,8 @@ class VerifierPiecewiseQuadratic(Verifier):
                 for point in eligible_segment:
                     jump = float(
                         (
-                            (2 * right.Q @ point + right.p)
-                            - (2 * left.Q @ point + left.p)
+                            (right.Q @ point + right.p)
+                            - (left.Q @ point + left.p)
                         )
                         @ normal
                     )
@@ -320,14 +320,14 @@ def _quadratic_extreme(form, polygon, maximum, tolerance):
     candidates = [point.copy() for point in polygon]
     for start, end in zip(polygon, np.roll(polygon, -1, axis=0)):
         direction = end - start
-        a = float(direction @ form.Q @ direction)
-        b = float(2 * start @ form.Q @ direction + form.p @ direction)
+        a = float(0.5 * direction @ form.Q @ direction)
+        b = float(start @ form.Q @ direction + form.p @ direction)
         if abs(a) > tolerance:
             rate = -b / (2 * a)
             if tolerance < rate < 1 - tolerance:
                 candidates.append(start + rate * direction)
     try:
-        stationary = np.linalg.solve(2 * form.Q, -form.p)
+        stationary = np.linalg.solve(form.Q, -form.p)
         if _point_in_polygon(stationary, polygon, tolerance):
             candidates.append(stationary)
     except np.linalg.LinAlgError:
@@ -341,8 +341,8 @@ def _quadratic_segment_extrema(form, segment, tolerance):
     start, end = segment
     direction = end - start
     candidates = [start, end]
-    a = float(direction @ form.Q @ direction)
-    b = float(2 * start @ form.Q @ direction + form.p @ direction)
+    a = float(0.5 * direction @ form.Q @ direction)
+    b = float(start @ form.Q @ direction + form.p @ direction)
     if abs(a) > tolerance:
         rate = -b / (2 * a)
         if tolerance < rate < 1 - tolerance:
@@ -381,8 +381,8 @@ def _outside_rectangle_parameter_intervals(segment, rectangle, tolerance):
 def _quadratic_sublevel_parameter_intervals(form, segment, beta, intervals, tolerance):
     start, end = segment
     direction = end - start
-    a = float(direction @ form.Q @ direction)
-    b = float(2 * start @ form.Q @ direction + form.p @ direction)
+    a = float(0.5 * direction @ form.Q @ direction)
+    b = float(start @ form.Q @ direction + form.p @ direction)
     c = form.value(start) - beta
     if abs(a) <= tolerance:
         if abs(b) <= tolerance:

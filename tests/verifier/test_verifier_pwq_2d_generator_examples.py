@@ -108,7 +108,7 @@ def test_generator_violation_inside_target_is_ignored(monkeypatch):
 
 def test_generator_finds_interior_quadratic_counterexample(monkeypatch):
     generator = QuadraticForm(
-        Q=np.array([[-1.0, 0.0], [0.0, -1.0]]),
+        Q=np.array([[-2.0, 0.0], [0.0, -2.0]]),
         p=np.array([0.6, 0.0]),
         c=-0.09,
     )

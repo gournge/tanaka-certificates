@@ -20,7 +20,7 @@ class QuadraticForm:
     c: float
 
     def value(self, point: np.ndarray) -> float:
-        return float(point @ self.Q @ point + self.p @ point + self.c)
+        return float(0.5 * point @ self.Q @ point + self.p @ point + self.c)
 
 
 class _CertificateGenerator1D(nn.Module):
@@ -80,8 +80,12 @@ def check_supremum_of_generator_on_cell_below_eps(
     Their ``drift`` and ``diffusion`` methods must therefore accept batched
     torch tensors and consist of operations supported by auto-LiRPA.
     """
-    if eps < 0:
-        raise ValueError("eps must be nonnegative")
+    if not math.isfinite(eps) or eps < 0:
+        raise ValueError("eps must be finite and nonnegative")
+    if not math.isfinite(beta):
+        raise ValueError("beta must be finite")
+    if not math.isfinite(tolerance) or tolerance < 0:
+        raise ValueError("tolerance must be finite and nonnegative")
     if max_depth < 0:
         raise ValueError("max_depth must be nonnegative")
     polygon = np.asarray(polygon, dtype=float)
@@ -89,8 +93,19 @@ def check_supremum_of_generator_on_cell_below_eps(
         raise ValueError("polygon dimension does not match SDE state dimension")
     if len(polygon) < 3:
         return None, None, -math.inf
+    arrays = (polygon, cell.Q, cell.p, np.asarray(cell.c))
+    if not all(np.all(np.isfinite(array)) for array in arrays):
+        raise ValueError("cell and polygon coefficients must be finite")
+    if cell.Q.shape != (sde.state_dim, sde.state_dim) or cell.p.shape != (
+        sde.state_dim,
+    ):
+        raise ValueError("cell dimension does not match SDE state dimension")
+    if not np.allclose(cell.Q, cell.Q.T, atol=tolerance, rtol=0.0):
+        raise ValueError("cell.Q must be symmetric")
+    if not sde.time_homogeneous:
+        raise ValueError("generator verification requires a time-homogeneous SDE")
 
-    if isinstance(sde, IsotropicOrnsteinUhlenbeck):
+    if type(sde) is IsotropicOrnsteinUhlenbeck:
         return _check_ou(cell, sde, eps, polygon, beta, max_depth, tolerance)
     return _check_with_auto_lirpa(
         cell, sde, eps, polygon, beta, max_depth, tolerance
@@ -102,34 +117,38 @@ def _ou_generator_form(
 ) -> QuadraticForm:
     rate = sde.mean_reversion
     mean = np.full(sde.state_dim, sde.long_term_mean)
-    hessian = cell.Q + cell.Q.T
     return QuadraticForm(
-        -rate * hessian,
-        rate * hessian @ mean - rate * cell.p,
+        -2.0 * rate * cell.Q,
+        rate * cell.Q @ mean - rate * cell.p,
         float(
             rate * cell.p @ mean
-            + sde.volatility**2 * np.trace(cell.Q)
+            + 0.5 * sde.volatility**2 * np.trace(cell.Q)
         ),
     )
 
 
 def _check_ou(cell, sde, eps, polygon, beta, max_depth, tolerance):
     objective = _ou_generator_form(cell, sde)
+    if not all(
+        np.all(np.isfinite(value))
+        for value in (objective.Q, objective.p, np.asarray(objective.c))
+    ):
+        raise ValueError("SDE coefficients must be finite")
     level_form = QuadraticForm(cell.Q, cell.p, cell.c)
     required_upper = -eps
-    if np.linalg.norm(level_form.Q, ord=np.inf) <= tolerance:
+    if not np.any(level_form.Q):
         clipped = _clip_polygon(
             polygon, level_form.p, beta - level_form.c, tolerance
         )
         if len(clipped) < 3:
             return None, None, -math.inf
         value, point = _quadratic_extreme(objective, clipped, True, tolerance)
-        if value > required_upper + tolerance:
+        if value > required_upper:
             return point, value, value
         return None, None, value
 
     best: tuple[float, np.ndarray] | None = None
-    unresolved_upper = -math.inf
+    certified_upper = -math.inf
     stack = [(polygon, 0)]
 
     while stack:
@@ -140,26 +159,28 @@ def _check_ou(cell, sde, eps, polygon, beta, max_depth, tolerance):
         objective_max = _quadratic_extreme(objective, current, True, tolerance)
         level_max = _quadratic_extreme(level_form, current, True, tolerance)[0]
         if level_max <= beta + tolerance:
+            certified_upper = max(certified_upper, objective_max[0])
             if best is None or objective_max[0] > best[0]:
                 best = objective_max
             continue
         if level_form.value(objective_max[1]) <= beta + tolerance:
             if best is None or objective_max[0] > best[0]:
                 best = objective_max
-        if objective_max[0] <= required_upper + tolerance:
+        if objective_max[0] <= required_upper:
+            certified_upper = max(certified_upper, objective_max[0])
             continue
         if depth >= max_depth:
-            unresolved_upper = max(unresolved_upper, objective_max[0])
+            certified_upper = max(certified_upper, objective_max[0])
             continue
         children = _bisect_polygon(current, tolerance)
         if len(children) < 2:
-            unresolved_upper = max(unresolved_upper, objective_max[0])
+            certified_upper = max(certified_upper, objective_max[0])
         else:
             stack.extend((child, depth + 1) for child in children)
 
     feasible_max = -math.inf if best is None else best[0]
-    certified_upper = max(feasible_max, unresolved_upper)
-    if best is not None and best[0] > required_upper + tolerance:
+    certified_upper = max(feasible_max, certified_upper)
+    if best is not None and best[0] > required_upper:
         return best[1], best[0], certified_upper
     return None, None, certified_upper
 
@@ -174,12 +195,12 @@ class _Generator(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         drift = self.sde.drift(0.0, x)
         diffusion = self.sde.diffusion(0.0, x)
-        gradient = x @ (self.Q + self.Q.T) + self.p
+        gradient = x @ self.Q + self.p
         drift_term = (gradient * drift).sum(dim=-1)
         # trace(g g.T Q) = trace(g.T Q g), including a leading batch axis.
         # Keep this in elementary ops understood by auto-LiRPA's converter.
         q_diffusion = torch.matmul(self.Q, diffusion)
-        diffusion_term = (diffusion * q_diffusion).sum(dim=(-2, -1))
+        diffusion_term = 0.5 * (diffusion * q_diffusion).sum(dim=(-2, -1))
         return (drift_term + diffusion_term).unsqueeze(-1)
 
 
@@ -197,16 +218,18 @@ def _check_with_auto_lirpa(cell, sde, eps, polygon, beta, max_depth, tolerance):
             continue
         lower, upper = current.min(axis=0), current.max(axis=0)
         bound = _auto_lirpa_upper(model, lower, upper)
+        if not math.isfinite(bound):
+            return None, None, math.inf
         for point in _candidate_points(current):
             if level_form.value(point) <= beta + tolerance:
                 value = _evaluate_generator(cell, sde, point)
+                if not math.isfinite(value):
+                    return None, None, math.inf
                 if best_witness is None or value > best_witness[0]:
                     best_witness = value, point.copy()
-        if bound <= required_upper + tolerance:
+        if bound <= required_upper:
             terminal_upper = max(terminal_upper, bound)
             continue
-        if best_witness is not None and best_witness[0] > required_upper + tolerance:
-            return best_witness[1], best_witness[0], bound
         if depth >= max_depth:
             terminal_upper = max(terminal_upper, bound)
             continue
@@ -216,6 +239,8 @@ def _check_with_auto_lirpa(cell, sde, eps, polygon, beta, max_depth, tolerance):
         else:
             stack.extend((child, depth + 1) for child in children)
 
+    if best_witness is not None and best_witness[0] > required_upper:
+        return best_witness[1], best_witness[0], terminal_upper
     return None, None, terminal_upper
 
 
@@ -248,19 +273,21 @@ def _quadratic_extreme(form, polygon, maximum, tolerance):
     candidates = [point.copy() for point in polygon]
     for start, end in zip(polygon, np.roll(polygon, -1, axis=0)):
         direction = end - start
-        a = float(direction @ form.Q @ direction)
-        b = float(2 * start @ form.Q @ direction + form.p @ direction)
+        a = float(0.5 * direction @ form.Q @ direction)
+        b = float(start @ form.Q @ direction + form.p @ direction)
         if abs(a) > tolerance:
             rate = -b / (2 * a)
             if tolerance < rate < 1 - tolerance:
                 candidates.append(start + rate * direction)
     try:
-        stationary = np.linalg.solve(2 * form.Q, -form.p)
+        stationary = np.linalg.solve(form.Q, -form.p)
         if _point_in_polygon(stationary, polygon, tolerance):
             candidates.append(stationary)
     except np.linalg.LinAlgError:
         pass
     values = np.array([form.value(point) for point in candidates])
+    if not np.all(np.isfinite(values)):
+        raise FloatingPointError("quadratic evaluation produced a non-finite value")
     index = int(np.argmax(values) if maximum else np.argmin(values))
     return float(values[index]), np.asarray(candidates[index])
 

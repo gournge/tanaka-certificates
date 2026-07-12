@@ -2,12 +2,12 @@ r"""Numerical baseline verifier for multidimensional PWQ certificates.
 
 Cell discovery writes the continuous certificate as
 
-``V_i(x) = x.T @ Q_i @ x + p_i.T @ x + c_i``
+``V_i(x) = c_i + p_i.T @ x + 1/2 x.T @ Q_i @ x``
 
-on each polyhedral cell ``K_i``.  Hence ``grad V_i = 2 Q_i x + p_i`` and
-``Hess V_i = 2 Q_i``.  For ``dX=f(X)dt+g(X)dW`` its interior generator is
+on each polyhedral cell ``K_i``. Hence ``grad V_i = Q_i x + p_i`` and
+``Hess V_i = Q_i``. For ``dX=f(X)dt+g(X)dW`` its interior generator is
 
-``L V_i = grad(V_i).T f + trace(g g.T Q_i)``.
+``L V_i = grad(V_i).T f + 1/2 trace(g g.T Q_i)``.
 
 The reach--avoid theorem requires
 
@@ -101,12 +101,12 @@ class VerifierPiecewiseQuadraticNumerical(Verifier):
         for index in np.flatnonzero(eligible & (cell_ids >= 0)):
             cell = self.cells[cell_ids[index]]
             point = points[index]
-            gradient = 2.0 * cell.Q @ point + cell.p
+            gradient = cell.Q @ point + cell.p
             diffusion = np.asarray(self.sde.diffusion(0.0, point), dtype=float)
             covariance = diffusion @ diffusion.T
             generator = float(
                 gradient @ np.asarray(self.sde.drift(0.0, point), dtype=float)
-                + np.trace(covariance @ cell.Q)
+                + 0.5 * np.trace(covariance @ cell.Q)
             )
             if worst is None or generator > worst[0]:
                 worst = (generator, index, cell.index)
@@ -144,7 +144,7 @@ class VerifierPiecewiseQuadraticNumerical(Verifier):
                         if problem.target.contains(point) or self._value(left, point) > problem.beta + self.tolerance:
                             continue
                         jump = float(
-                            ((2 * right.Q @ point + right.p) - (2 * left.Q @ point + left.p))
+                            ((right.Q @ point + right.p) - (left.Q @ point + left.p))
                             @ normal
                         )
                         if worst is None or jump > worst[0]:
@@ -177,7 +177,7 @@ class VerifierPiecewiseQuadraticNumerical(Verifier):
                 points @ cell.A.T <= cell.b + self.tolerance, axis=1
             )
             chosen = points[selected]
-            values[selected] = np.einsum("ni,ij,nj->n", chosen, cell.Q, chosen) + chosen @ cell.p + cell.c
+            values[selected] = 0.5 * np.einsum("ni,ij,nj->n", chosen, cell.Q, chosen) + chosen @ cell.p + cell.c
             cell_ids[selected] = cell.index
         if np.any(cell_ids < 0):
             raise RuntimeError("discovered cells do not cover the verification points")
@@ -229,4 +229,4 @@ class VerifierPiecewiseQuadraticNumerical(Verifier):
 
     @staticmethod
     def _value(cell, point):
-        return float(point @ cell.Q @ point + cell.p @ point + cell.c)
+        return float(0.5 * point @ cell.Q @ point + cell.p @ point + cell.c)

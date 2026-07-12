@@ -126,7 +126,7 @@ class ConstantDriftBrownian2D(SDEND):
         drift: tuple[float, float] = (1.0, 0.0),
         diffusion_scale: float = np.sqrt(2.0),
     ):
-        super().__init__(state_dim=2, noise_dim=2)
+        super().__init__(state_dim=2, noise_dim=2, time_homogeneous=True)
         drift_vector = np.asarray(drift, dtype=float)
         if drift_vector.shape != (2,):
             raise ValueError("drift must have shape (2,)")
