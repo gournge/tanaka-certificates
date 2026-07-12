@@ -25,7 +25,7 @@ def _constant_generator_form():
     return QuadraticForm(np.zeros((2, 2)), np.zeros(2), -1.0)
 
 
-def _two_cell_problem():
+def _two_cell_problem(*, delta=0.0):
     return ReachAvoidProblem(
         domain=create_hyperrectangle([0.0, -1.0], [1.0, 1.0]),
         initial=create_hyperrectangle([0.0, -1.0], [0.05, 1.0]),
@@ -34,6 +34,7 @@ def _two_cell_problem():
         alpha=0.2,
         beta=0.75,
         epsilon=0.01,
+        delta=delta,
     )
 
 
@@ -101,6 +102,63 @@ def test_interface_concavity_rejects_positive_normal_derivative_jump(monkeypatch
     assert issue.cell_indices == (0, 1)
     np.testing.assert_allclose(issue.value, 1.0)
     np.testing.assert_allclose(issue.point[0], 0.5)
+
+
+def test_face_discovery_is_invariant_under_halfspace_rescaling(monkeypatch):
+    """Scaling a halfspace must not change its shared face."""
+    cells = _two_vertical_cells(1.0, 2.0)
+    scale = 1e-14
+    for cell in cells:
+        cell.A *= scale
+        cell.b *= scale
+
+    verifier = _verify(cells, _two_cell_problem(), monkeypatch)
+    verifier._check_faces()
+
+    issue = next(
+        issue for issue in verifier.issues if issue.kind is IssueKind.CONCAVITY
+    )
+    assert issue.value == pytest.approx(1.0)
+
+
+def test_any_positive_normal_derivative_jump_is_rejected(monkeypatch):
+    """Numerical geometry tolerance must not relax the mathematical sign test."""
+    numerical_tolerance = 1e-8
+    positive_jump = numerical_tolerance / 2.0
+    verifier = _verify(
+        _two_vertical_cells(1.0, 1.0 + positive_jump),
+        _two_cell_problem(),
+        monkeypatch,
+    )
+    verifier.tolerance = numerical_tolerance
+
+    verifier._check_faces()
+
+    issue = next(
+        issue for issue in verifier.issues if issue.kind is IssueKind.CONCAVITY
+    )
+    assert issue.value == pytest.approx(positive_jump)
+
+
+def test_local_time_margin_rejects_insufficiently_negative_jump(monkeypatch):
+    verifier = _verify(
+        _two_vertical_cells(1.0, 0.95),
+        _two_cell_problem(delta=0.1),
+        monkeypatch,
+    )
+
+    verifier._check_faces()
+
+    issue = next(
+        issue for issue in verifier.issues if issue.kind is IssueKind.CONCAVITY
+    )
+    assert issue.value == pytest.approx(-0.05)
+    assert issue.bound == pytest.approx(-0.1)
+
+
+def test_local_time_margin_must_be_nonnegative():
+    with pytest.raises(ValueError, match="delta must be finite and nonnegative"):
+        _two_cell_problem(delta=-0.1)
 
 
 def test_interface_concavity_can_fail_at_three_cell_intersection(monkeypatch):

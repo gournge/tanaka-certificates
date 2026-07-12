@@ -16,7 +16,7 @@ The reach--avoid theorem requires
 * ``L V_i <= -epsilon`` in each cell, restricted to the sub-beta basin and
   excluding the target; and
 * on a face crossed from ``K_i`` to ``K_j``,
-  ``(grad V_j - grad V_i).T n_{i->j} <= 0``.
+  ``(grad V_j - grad V_i).T n_{i->j} <= -delta``.
 
 The last inequality is the multidimensional concavity condition.  In the
 Itô--Tanaka formula it makes the surface-local-time term nonpositive.  On the
@@ -156,13 +156,14 @@ class VerifierPiecewiseQuadraticNumerical(Verifier):
                                 start.copy(),
                                 end.copy(),
                             )
-        if worst is not None and worst[0] > self.tolerance:
+        jump_bound = -problem.delta
+        if worst is not None and worst[0] > jump_bound:
             self.issues.append(
                 VerificationIssue(
                     IssueKind.CONCAVITY,
                     worst[1],
                     worst[0],
-                    0.0,
+                    jump_bound,
                     (worst[2], worst[3]),
                     (worst[4], worst[5]),
                     None,
@@ -197,12 +198,12 @@ class VerifierPiecewiseQuadraticNumerical(Verifier):
         found = []
         for a, b in zip(left.A, left.b):
             norm = np.linalg.norm(a)
-            if norm <= self.tolerance:
+            if norm == 0.0:
                 continue
             normal, offset = a / norm, b / norm
             for other_a, other_b in zip(right.A, right.b):
                 other_norm = np.linalg.norm(other_a)
-                if other_norm <= self.tolerance:
+                if other_norm == 0.0:
                     continue
                 if np.allclose(normal, -other_a / other_norm, atol=1e-7) and np.isclose(offset, -other_b / other_norm, atol=1e-7):
                     if not any(np.allclose(normal, old[0]) and np.isclose(offset, old[1]) for old in found):

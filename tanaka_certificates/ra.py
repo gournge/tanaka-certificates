@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 
 from tanaka_certificates.regions import Region, IntervalUnion
@@ -12,6 +13,11 @@ class ReachAvoidProblem:
     alpha: float
     beta: float
     epsilon: float
+    delta: float = 0.0
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.delta) or self.delta < 0.0:
+            raise ValueError("delta must be finite and nonnegative")
 
 
 class ReachAvoidProblem1D(ReachAvoidProblem):
@@ -22,3 +28,4 @@ class ReachAvoidProblem1D(ReachAvoidProblem):
     alpha: float
     beta: float
     epsilon: float
+    delta: float
