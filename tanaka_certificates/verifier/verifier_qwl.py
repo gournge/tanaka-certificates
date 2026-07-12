@@ -14,20 +14,21 @@ A reach--avoid certificate satisfies ``sup_initial V <= alpha`` and
 sub-beta basin, it must satisfy ``L V_i <= -epsilon``.  Across a face with
 normal pointing from ``K_i`` to ``K_j`` it must also satisfy
 
-``(grad V_j - grad V_i).T n <= 0``.
+``(grad V_j - grad V_i).T n <= -delta``.
 
-The last condition is the multidimensional concavity condition.  It makes the
-surface-local-time term in the Itô--Tanaka formula nonpositive.  Together with
-the generator inequality and the stopped stochastic integral being a
-martingale, it makes ``V(X_{t wedge tau_K})`` a supermartingale.  The proof is
-developed in ``docs/research/log/sections/05-piecewise-quadratic-multidim.tex``.
+The last condition is the multidimensional concavity condition. It makes the
+surface-local-time term in the Itô--Tanaka formula nonpositive. Conditions are
+needed only until the first domain exit, target hit, or hit of ``V >= beta``.
+The proof is developed in
+``docs/research/log/sections/05-piecewise-quadratic-multidim.tex``.
 
 There is no sampling in this verifier.  Hyperrectangles are clipped against
 each cell to form exact polygons; quadratic extrema are attained at polygon
 vertices, stationary points on edges, or an interior stationary point, all of
 which are enumerated.  Shared faces and their affine normal-derivative jumps
-are checked exactly on the portions satisfying ``V <= beta`` and lying
-outside the target.  Cell/sublevel intersections are resolved by adaptive
+are checked on the closure ``V <= beta`` outside the target. Checking the
+closure is conservative for the stopping convention above. Cell/sublevel
+intersections are resolved by adaptive
 polygon subdivision.  If a quadratic boundary cannot be separated within the
 configured depth, the verifier returns ``UNKNOWN`` rather than sampling.
 
@@ -187,8 +188,6 @@ class VerifierPiecewiseQuadratic(Verifier):
                 )
             )
 
-    # TODO: add test case for <= -delta
-    # TODO: add test where we check corners
     def _check_faces(self):
         domain = self.reach_avoid_problem.domain
         jump_failures = []
@@ -256,13 +255,19 @@ class VerifierPiecewiseQuadratic(Verifier):
                             eligible_segment,
                             normal.copy(),
                         )
-            if face_worst is not None and face_worst[0] > self.tolerance:
+            jump_bound = -self.reach_avoid_problem.delta
+            if face_worst is not None and face_worst[0] > jump_bound:
                 jump_failures.append(face_worst)
         self.issues.extend(
             _face_issue(IssueKind.CONTINUITY, failure, 0.0) for failure in gap_failures
         )
         self.issues.extend(
-            _face_issue(IssueKind.CONCAVITY, failure, 0.0) for failure in jump_failures
+            _face_issue(
+                IssueKind.CONCAVITY,
+                failure,
+                -self.reach_avoid_problem.delta,
+            )
+            for failure in jump_failures
         )
 
 
@@ -278,6 +283,12 @@ def _rectangle_polygon(rectangle):
 def _cell_rectangle_polygon(cell, rectangle, tolerance):
     polygon = _rectangle_polygon(rectangle)
     for normal, bound in zip(cell.A, cell.b):
+        norm = float(np.linalg.norm(normal))
+        if norm == 0.0:
+            if bound < 0.0:
+                return np.empty((0, 2))
+            continue
+        normal, bound = normal / norm, bound / norm
         polygon = _clip_polygon(polygon, normal, bound, tolerance)
         if len(polygon) == 0:
             break
