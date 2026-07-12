@@ -135,7 +135,7 @@ def test_discover_seven_simple_relu_regions():
 
         np.testing.assert_allclose(
             cell.Q,
-            np.asarray(item["Q"]),
+            2.0 * np.asarray(item["Q"]),
             atol=1e-10,
         )
         np.testing.assert_allclose(
@@ -225,7 +225,7 @@ def test_discover_eight_multi_output_pwq_cells():
 
     for point, Q, p, cell_c in expected:
         cell = _find_unique_cell_containing(cells, point)
-        np.testing.assert_allclose(cell.Q, Q, atol=1e-10)
+        np.testing.assert_allclose(cell.Q, 2.0 * np.asarray(Q), atol=1e-10)
         np.testing.assert_allclose(cell.p, p, atol=1e-10)
         assert cell.c == pytest.approx(cell_c, abs=1e-10)
 
@@ -257,5 +257,5 @@ def test_discover_eight_multi_output_pwq_cells():
 
     for point, expected_value in zip(points, expected_values):
         cell = _find_unique_cell_containing(cells, tuple(point))
-        discovered_value = point @ cell.Q @ point + cell.p @ point + cell.c
+        discovered_value = 0.5 * point @ cell.Q @ point + cell.p @ point + cell.c
         assert discovered_value == pytest.approx(expected_value, abs=1e-10)

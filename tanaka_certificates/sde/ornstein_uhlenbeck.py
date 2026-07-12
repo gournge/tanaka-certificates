@@ -32,7 +32,9 @@ class IsotropicOrnsteinUhlenbeck(SDEND):
         volatility: float = 1.0,
         long_term_mean: float = 0.0,
     ):
-        super().__init__(state_dim=dimension, noise_dim=dimension)
+        super().__init__(
+            state_dim=dimension, noise_dim=dimension, time_homogeneous=True
+        )
         self.mean_reversion = mean_reversion
         self.volatility = volatility
         self.long_term_mean = long_term_mean

@@ -24,7 +24,7 @@ class TorchNonlinearSDE(SDEND):
     """The torch-compatible nonlinear SDE used by the auto-LiRPA test."""
 
     def __init__(self):
-        super().__init__(state_dim=2, noise_dim=2)
+        super().__init__(state_dim=2, noise_dim=2, time_homogeneous=True)
 
     def drift(self, t, x):
         first = (

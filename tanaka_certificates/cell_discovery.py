@@ -15,7 +15,7 @@ from tanaka_certificates.nn.last_layer_activation import (
 
 @dataclass
 class Cell:
-    """A cell K_i in the piecewise quadratic certificate.
+    r"""A cell K_i carrying ``V(x) = c + p.T x + 1/2 x.T Q x``.
 
     Attributes:
         index: The index of the cell.
@@ -398,7 +398,7 @@ def discover_cells_from_network_weights(
 
     On each discovered cell the returned polynomial has the form
 
-        x.T @ Q @ x + p.T @ x + c.
+        c + p.T @ x + 1/2 x.T @ Q @ x.
 
     Lower-dimensional boundary-only activation patterns are not returned.
     Adjacent cells nevertheless contain their shared boundaries because each
@@ -503,7 +503,11 @@ def discover_cells_from_network_weights(
                 affine_offset = float(output_bias[output_index])
                 multiplier = float(lam[output_index])
 
-                Q += multiplier * piece_Q * np.outer(affine_normal, affine_normal)
+                # Cell matrices use V = c + p.T x + 1/2 x.T Q x, while
+                # PiecewiseQuadratic1D stores the coefficient of z**2.
+                Q += 2.0 * multiplier * piece_Q * np.outer(
+                    affine_normal, affine_normal
+                )
 
                 p += (
                     multiplier

@@ -37,16 +37,22 @@ class SDEND(SDE):
 
     ``drift`` returns a vector of shape ``(state_dim,)`` and ``diffusion``
     returns a matrix of shape ``(state_dim, noise_dim)``.
+
+    Set ``time_homogeneous=True`` only when both coefficients are independent
+    of time. Certified generator checks require that declaration.
     """
 
     state_dim: int
     noise_dim: int
 
-    def __init__(self, state_dim: int, noise_dim: int):
+    def __init__(
+        self, state_dim: int, noise_dim: int, *, time_homogeneous: bool = False
+    ):
         if state_dim <= 0 or noise_dim <= 0:
             raise ValueError("state_dim and noise_dim must be positive")
         self.state_dim = state_dim
         self.noise_dim = noise_dim
+        self.time_homogeneous = time_homogeneous
 
 
 class EulerMaruyama:
