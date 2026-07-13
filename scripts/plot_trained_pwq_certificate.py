@@ -186,13 +186,26 @@ def _simulate_paths(sde, problem, n_paths, horizon, n_steps, seed):
         time, states = solver.simulate(
             sde, initial, horizon, n_steps, seed=seed + index + 1
         )
-        inside = np.all(
-            (states >= problem.domain.lower) & (states <= problem.domain.upper), axis=1
-        )
-        first_exit = np.flatnonzero(~inside)
-        stop = int(first_exit[0]) if len(first_exit) else len(states)
-        paths.append((time[:stop], states[:stop]))
+        paths.append((time, states))
     return paths
+
+
+def _stopped_path_values(states, values, problem):
+    """Hold V(X_t) after target, domain-boundary, or super-beta stopping."""
+    values = np.asarray(values, dtype=float).copy()
+    strictly_inside = np.all(
+        (states > problem.domain.lower) & (states < problem.domain.upper), axis=1
+    )
+    in_target = np.asarray([problem.target.contains(point) for point in states])
+    terminal = ~strictly_inside | in_target | (values >= problem.beta)
+    stops = np.flatnonzero(terminal)
+    if not len(stops):
+        return values
+
+    stop = int(stops[0])
+    stopped_value = problem.beta if values[stop] >= problem.beta else values[stop]
+    values[stop:] = stopped_value
+    return values
 
 
 def _region_points(region, resolution: int) -> np.ndarray:
@@ -407,6 +420,7 @@ def plot_trained_pwq_certificate(
             issue_colors = {
                 IssueKind.INITIAL: "#ffb000",
                 IssueKind.UNSAFE: "#d62728",
+                IssueKind.DOMAIN_BOUNDARY: "#1f77b4",
                 IssueKind.GENERATOR: "#e83e8c",
                 IssueKind.CONCAVITY: "#00ffff",
                 IssueKind.CONTINUITY: "#7f00ff",
@@ -447,15 +461,10 @@ def plot_trained_pwq_certificate(
                 path_values = _evaluate_certificate(certificate, states)
             else:
                 path_values = _evaluate_reference(reference, problem, states)
-            trajectory_matrix[path_index, : len(path_values)] = path_values
+            path_values = _stopped_path_values(states, path_values, problem)
+            trajectory_matrix[path_index] = path_values
             path_axis.plot(time, path_values, color="#4c78a8", alpha=0.18, linewidth=0.8)
-        counts = np.sum(np.isfinite(trajectory_matrix), axis=0)
-        mean_values = np.divide(
-            np.nansum(trajectory_matrix, axis=0),
-            counts,
-            out=np.full(n_steps + 1, np.nan),
-            where=counts > 0,
-        )
+        mean_values = trajectory_matrix.mean(axis=0)
         valid_mean = np.isfinite(mean_values)
         path_axis.plot(
             common_time[valid_mean],

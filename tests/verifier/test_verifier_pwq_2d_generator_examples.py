@@ -50,6 +50,7 @@ def _verify(generator_form, problem, monkeypatch: pytest.MonkeyPatch):
     verifier.sublevel_max_depth = 12
     verifier._unresolved = False
     verifier.issues = []
+    verifier._check_domain_boundary = lambda: None
     monkeypatch.setattr(
         generator_supremum, "_ou_generator_form", lambda cell, sde: generator_form
     )

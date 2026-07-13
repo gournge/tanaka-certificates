@@ -13,6 +13,7 @@ The reach--avoid theorem requires
 
 * ``sup_initial V <= alpha``;
 * ``inf_unsafe V >= beta``;
+* ``inf_domain_boundary V >= beta`` outside the target;
 * ``L V_i <= -epsilon`` in each cell, restricted to the sub-beta basin and
   excluding the target; and
 * on a face crossed from ``K_i`` to ``K_j``,
@@ -76,6 +77,7 @@ class VerifierPiecewiseQuadraticNumerical(Verifier):
         problem = self.reach_avoid_problem
         self._check_region(problem.initial, IssueKind.INITIAL, problem.alpha, maximum=True)
         self._check_region(problem.unsafe, IssueKind.UNSAFE, problem.beta, maximum=False)
+        self._check_domain_boundary()
         self._check_generator()
         self._check_faces()
         return VerificationResult.NOT_VERIFIED if self.issues else VerificationResult.VERIFIED
@@ -118,6 +120,36 @@ class VerifierPiecewiseQuadraticNumerical(Verifier):
                     worst[0],
                     -problem.epsilon,
                     (worst[2],),
+                )
+            )
+
+    def _check_domain_boundary(self):
+        problem = self.reach_avoid_problem
+        lo, hi = problem.domain.lower, problem.domain.upper
+        rates = np.linspace(0.0, 1.0, self.face_resolution)
+        points = []
+        for dimension in range(2):
+            varying = 1 - dimension
+            for value in (lo[dimension], hi[dimension]):
+                edge = np.tile((lo + hi) / 2.0, (self.face_resolution, 1))
+                edge[:, dimension] = value
+                edge[:, varying] = lo[varying] + rates * (hi[varying] - lo[varying])
+                points.extend(edge)
+        points = np.asarray(
+            [point for point in points if not problem.target.contains(point)]
+        )
+        if not len(points):
+            return
+        values, cell_ids = self._piece_values(points)
+        index = int(np.argmin(values))
+        if values[index] < problem.beta - self.tolerance:
+            self.issues.append(
+                VerificationIssue(
+                    IssueKind.DOMAIN_BOUNDARY,
+                    points[index].copy(),
+                    float(values[index]),
+                    problem.beta,
+                    (int(cell_ids[index]),),
                 )
             )
 

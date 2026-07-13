@@ -87,7 +87,8 @@ such that
   \begin{equation}
     \label{eq:boundary-conditions}
     \sup_{x\in X_0}V(x)\leq\alpha \qquad\text{and}\qquad
-    \inf_{x\in X_u}V(x)\geq\beta
+    \inf_{x\in X_u}V(x)\geq\beta \qquad\text{and}\qquad
+    \inf_{x\in\partial D\setminus X_\tau}V(x)\geq\beta
   \end{equation}
   \item generator condition holds: 
   \begin{equation}
@@ -103,8 +104,8 @@ where, at smooth points,
   \label{eq:generator}
 \end{equation}
 
-Following the piecewise-quadratic setup, suppose that a compact verification
-region $K\subseteq D$ is partitioned into finitely many polyhedral cells,
+Following the piecewise-quadratic setup, suppose that the compact verification
+region $K=D$ is partitioned into finitely many polyhedral cells,
 \[
   K=\bigcup_{i=1}^N K_i,
 \]
@@ -134,9 +135,23 @@ nonpositive when
   \qquad x\in F.
   \label{eq:interface-condition}
 \end{equation}
+Define the stopping time
+\begin{equation}
+  \tau
+  =\inf\left\{t\geq0:
+    X_t\in X_\tau
+    \ \text{or}\
+    X_t\in\partial K
+    \ \text{or}\
+    V(X_t)\geq\beta
+  \right\}.
+  \label{eq:reach-avoid-stopping-time}
+\end{equation}
 Together with square-integrability of the stochastic integral, continuity,
 the cellwise generator condition, and this interface condition ensure that
-$V(X_t)$ is a supermartingale up to the first exit time from $K$.
+$V(X_{t\wedge\tau})$ is a supermartingale.  The generator and interface
+conditions are required only before $\tau$, namely outside the target and in
+the sub-$\beta$ basin.
 
 \begin{figure}[h]
   \centering
@@ -148,9 +163,10 @@ $V(X_t)$ is a supermartingale up to the first exit time from $K$.
   \label{fig:interface-condition-examples}
 \end{figure}
 
-The process is stopped after reaching the target or unsafe set: once the
-reach--avoid property has been achieved or violated, its later trajectory is
-irrelevant.
+The process is stopped upon touching the target, the boundary of the domain,
+or the super-$\beta$ set.  The unsafe-set condition guarantees that a
+continuous path reaching the unsafe set has reached the super-$\beta$ set no
+later than that moment.
 
 \begin{quote} 
   \textbf{Remark}. \label{remark:piecewise-quadratic} We model a certificate $V$ as:
@@ -503,7 +519,9 @@ multidimensional piecewise-quadratic verifier.
   \caption{The explicit two-dimensional piecewise-quadratic verification
   example.  The certificate is split across the interface $x_1=1/2$, the
   generator is uniformly negative, and sampled trajectories show both
-  $X_t$ and the stopped certificate process $V(X_{t\wedge\tau_K})$.}
+  $X_t$ and a stopped certificate process.  This example illustrates the
+  interior and interface checks but, as discussed below, does not satisfy the
+  domain-boundary condition of the full reach--avoid verifier.}
   \label{fig:pwq-2d-verification-example}
 \end{figure}
 
@@ -607,7 +625,7 @@ On the right side,
 \]
 Thus $V_1=V_2$ on $F$, so $V$ is continuous.
 
-\subsection{Boundary conditions}
+\subsection{Initial, unsafe, and domain-boundary conditions}
 
 Take
 \[
@@ -651,7 +669,18 @@ $[19/20,1]$, so the minimum occurs at $x_1=1$:
   =
   \beta.
 \]
-Therefore the boundary separation condition holds.
+Therefore the initial/unsafe separation condition holds.  It is important,
+however, that this candidate does \emph{not} satisfy the domain-boundary
+condition required by the stopping convention
+\eqref{eq:reach-avoid-stopping-time}.  For example, on the horizontal domain
+edges,
+\[
+  V(0,\pm1)=0<\beta=\frac14.
+\]
+Unless these boundary points are included in the target, the exact verifier
+must reject this candidate.  The example below should therefore be read as an
+explicit demonstration of the generator and interface local-time conditions,
+not as a complete reach--avoid certificate.
 
 \subsection{Generator condition}
 
@@ -760,14 +789,14 @@ The stochastic integral is
 \[
   M_t
   =
-  \int_0^{t\wedge\tau_K}
+  \int_0^{t\wedge\tau}
   \nabla V(X_s)^\top\sqrt{2}I_2\,dW_s.
 \]
 Since $K$ is compact and $V$ is piecewise quadratic with finitely many cells,
 $\nabla V$ is bounded on $K$. Hence, for each fixed $t$,
 \[
   \mathbb E\left[
-    \int_0^{t\wedge\tau_K}
+    \int_0^{t\wedge\tau}
     \left\|
       \nabla V(X_s)^\top\sqrt{2}I_2
     \right\|^2ds
@@ -778,24 +807,22 @@ so $M_t$ is a true martingale.
 
 \subsection{Conclusion}
 
-All sufficient conditions from the multidimensional piecewise-quadratic
-argument hold:
+The following structural conditions from the multidimensional
+piecewise-quadratic argument hold:
 \begin{enumerate}
   \item $V$ is continuous and piecewise quadratic on the polyhedral partition
   $K=K_1\cup K_2$,
-  \item the boundary separation inequalities hold with
+  \item the initial/unsafe separation inequalities hold with
   $\alpha=1/20$ and $\beta=1/4$,
   \item the generator satisfies $\mathcal LV\leq-2/5$ on both cells,
   \item the normal derivative jump across $F$ is $-3/20<0$,
   \item the stopped stochastic integral is a martingale.
 \end{enumerate}
-Therefore
-\[
-  V(X_{t\wedge\tau_K})
-\]
-is a supermartingale. In particular, this gives a fully explicit two-dimensional
-verification example where the curvature term in the quadratic pieces
-compensates for the positive drift in the $x_1$ direction.
+Consequently, the example establishes the intended drift and local-time
+behavior up to the stopping time, but it is not a complete reach--avoid
+verification example because the domain-boundary separation condition fails.
+It remains a fully explicit example where the curvature term in the quadratic
+pieces compensates for the positive drift in the $x_1$ direction.
 
 \newpage
 
@@ -824,6 +851,12 @@ I was training the certificate with the losses:
     \max\{(\beta+\delta)-V(x),0\}
   \)
   for $x\in X_u$, where the constraint margin was $\delta=0.1$.
+
+  This historical experiment did not yet penalize points on the boundary of
+  the training domain.  Under the stopping convention
+  \eqref{eq:reach-avoid-stopping-time}, non-target domain-boundary samples also
+  require the lower-level penalty
+  $\max\{(\beta+\delta)-V(x),0\}$.
 
   \item \textbf{Generator loss.}  For sampled domain points outside the target,
   I penalized the cheaper of the two violations
