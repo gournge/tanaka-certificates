@@ -1,4 +1,33 @@
-from scripts.plot_trained_pwq_certificate import plot_trained_pwq_certificate
+import numpy as np
+
+from scripts.plot_trained_pwq_certificate import (
+    _stopped_path_values,
+    plot_trained_pwq_certificate,
+)
+from tanaka_certificates.problems import make_ou_problem
+
+
+def test_stopped_values_hold_after_super_beta_target_or_domain_boundary():
+    _, problem = make_ou_problem()
+    ordinary = np.array([[0.9, -1.0], [0.7, -0.7], [0.6, -0.6], [0.5, -0.5]])
+    np.testing.assert_allclose(
+        _stopped_path_values(ordinary, [0.5, 1.0, 2.1, 3.0], problem),
+        [0.5, 1.0, 2.0, 2.0],
+    )
+
+    hits_target = ordinary.copy()
+    hits_target[1] = [0.0, 0.0]
+    np.testing.assert_allclose(
+        _stopped_path_values(hits_target, [0.5, 0.3, 0.8, 1.0], problem),
+        [0.5, 0.3, 0.3, 0.3],
+    )
+
+    hits_boundary = ordinary.copy()
+    hits_boundary[1] = problem.domain.upper
+    np.testing.assert_allclose(
+        _stopped_path_values(hits_boundary, [0.5, 1.2, 0.8, 1.0], problem),
+        [0.5, 1.2, 1.2, 1.2],
+    )
 
 
 def test_plot_trained_pwq_certificate_creates_comparison(tmp_path):

@@ -82,6 +82,7 @@ def test_linear_piece_passes_all_pwq_checks():
         _problem(),
         _whole_plane_linear_cell(),
     )
+    verifier._check_domain_boundary = lambda: None
 
     assert verifier.verify() is VerificationResult.VERIFIED
     assert verifier.issues == []
@@ -94,6 +95,7 @@ def test_generator_failure_records_counterexample():
         _problem(epsilon=0.3),
         _whole_plane_linear_cell(),
     )
+    verifier._check_domain_boundary = lambda: None
 
     assert verifier.verify() is VerificationResult.NOT_VERIFIED
     issue = next(issue for issue in verifier.issues if issue.kind is IssueKind.GENERATOR)
@@ -148,6 +150,7 @@ def test_generator_violation_above_beta_is_ignored(monkeypatch: pytest.MonkeyPat
         problem,
         _whole_plane_linear_cell(),
     )
+    verifier._check_domain_boundary = lambda: None
 
     assert verifier.verify() is VerificationResult.VERIFIED
     assert verifier.issues == []
@@ -170,6 +173,48 @@ def test_concavity_violation_on_super_beta_face_is_ignored():
         problem,
         _split_certificate(threshold=0.75, left_p=2.0, right_p=3.0, constant=1.5),
     )
+    verifier._check_domain_boundary = lambda: None
 
     assert verifier.verify() is VerificationResult.VERIFIED
+    assert verifier.issues == []
+
+
+def test_domain_boundary_reports_exact_minimum_below_beta():
+    verifier = VerifierPiecewiseQuadratic(
+        IsotropicOrnsteinUhlenbeck(2),
+        _problem(),
+        _whole_plane_linear_cell(),
+    )
+    verifier.issues = []
+
+    verifier._check_domain_boundary()
+
+    issue = next(
+        issue
+        for issue in verifier.issues
+        if issue.kind is IssueKind.DOMAIN_BOUNDARY
+    )
+    assert issue.value == pytest.approx(0.2)
+    assert issue.bound == 1.75
+    np.testing.assert_allclose(issue.point[0], 0.1)
+
+
+def test_constant_above_beta_passes_domain_boundary_check():
+    certificate = _one_layer_certificate(
+        weight=[0.0, 0.0],
+        bias=0.0,
+        activation=PiecewiseQuadratic1D(
+            intervals=[(-np.inf, np.inf)],
+            Qs=[0.0],
+            ps=[0.0],
+            cs=[2.0],
+        ),
+    )
+    verifier = VerifierPiecewiseQuadratic(
+        IsotropicOrnsteinUhlenbeck(2), _problem(), certificate
+    )
+    verifier.issues = []
+
+    verifier._check_domain_boundary()
+
     assert verifier.issues == []

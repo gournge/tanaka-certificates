@@ -510,7 +510,64 @@ certificate result. The interior generator condition controls the ordinary Itô
 drift, while the interface concavity condition controls the Tanaka local time
 terms.
 
+\subsection{Reach--avoid stopping convention}
+
+The exit-time result above is a general auxiliary result.  For the
+reach--avoid verifier, we stop earlier.  Let $X_\tau\subseteq K$ be the target
+and let $\beta$ be the upper certificate level.  The stopping time used by the
+verifier is
+\[
+\tau
+=
+\inf\left\{t\geq0:
+X_t\in X_\tau
+\ \text{or}\
+X_t\in\partial K
+\ \text{or}\
+V(X_t)\geq\beta
+\right\}.
+\]
+Thus touching the target, the boundary of the verification domain, or the
+super-$\beta$ set is the stopping moment.  In particular, the unsafe set is
+not a separate stopping event: the condition $V\geq\beta$ on the unsafe set
+ensures that a continuous path reaching it has already reached the
+super-$\beta$ stopping set.
+
+With this convention, the interior generator condition is needed only on
+\[
+\left\{x\in\operatorname{int}(K)\setminus X_\tau:V(x)<\beta\right\}.
+\]
+For verification it is conservative to check its closure, replacing
+$V<\beta$ by $V\leq\beta$.  Likewise, the normal-derivative jump condition is
+needed only on the portions of internal faces outside the target and in this
+sub-$\beta$ basin.  No generator or interface condition is required after the
+process has reached any of the three stopping sets.
+
+The stopping convention also requires the domain-boundary separation
+condition
+\[
+\inf_{x\in\partial K\setminus X_\tau}V(x)\geq\beta.
+\]
+Together with
+\[
+\sup_{x\in X_0}V(x)\leq\alpha,
+\qquad
+\inf_{x\in X_u}V(x)\geq\beta,
+\qquad
+\alpha<\beta,
+\]
+these are the conditions implemented by the multidimensional
+piecewise-quadratic verifier.  Applying the preceding It\^o--Tanaka argument
+up to $\tau$ shows that $V(X_{t\wedge\tau})$ is a supermartingale.
+
 \subsection{Asymptotic completeness of piecewise quadratic certificates}
+
+The theorem below retains the stronger exit-time formulation: it assumes the
+generator inequality throughout $K$ and therefore proves a supermartingale up
+to $\tau_K$.  To use its approximants as reach--avoid certificates under the
+convention above, one additionally needs a strict boundary margin for the
+smooth certificate on $\partial K\setminus X_\tau$; uniform approximation then
+preserves $V_h\geq\beta$ there.
 
 \paragraph{Theorem (asymptotic completeness under a strict smooth certificate).}
 Let \(K\subset\mathbb R^2\) be compact and polygonal, and consider the stopped

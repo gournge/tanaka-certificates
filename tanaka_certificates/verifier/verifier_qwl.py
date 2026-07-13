@@ -9,9 +9,10 @@ Thus ``grad V_i = Q_i x + p_i`` and ``Hess V_i = Q_i``. For the SDE
 
 ``L V_i = grad(V_i).T f + 1/2 trace(g g.T Q_i)``.
 
-A reach--avoid certificate satisfies ``sup_initial V <= alpha`` and
-``inf_unsafe V >= beta``.  In every smooth cell, outside the target and in the
-sub-beta basin, it must satisfy ``L V_i <= -epsilon``.  Across a face with
+A reach--avoid certificate satisfies ``sup_initial V <= alpha``,
+``inf_unsafe V >= beta``, and ``inf_domain_boundary V >= beta`` away from the
+target. In every smooth cell, outside the target and in the sub-beta basin, it
+must satisfy ``L V_i <= -epsilon``. Across a face with
 normal pointing from ``K_i`` to ``K_j`` it must also satisfy
 
 ``(grad V_j - grad V_i).T n <= -delta``.
@@ -61,6 +62,7 @@ from tanaka_certificates.verifier.base import Verifier, VerificationResult
 class IssueKind(str, Enum):
     INITIAL = "initial_value"
     UNSAFE = "unsafe_value"
+    DOMAIN_BOUNDARY = "domain_boundary"
     GENERATOR = "generator"
     CONCAVITY = "concavity"
     CONTINUITY = "continuity"
@@ -79,7 +81,7 @@ class VerificationIssue:
     def margin(self) -> float:
         return (
             self.bound - self.value
-            if self.kind is IssueKind.UNSAFE
+            if self.kind in (IssueKind.UNSAFE, IssueKind.DOMAIN_BOUNDARY)
             else self.value - self.bound
         )
 
@@ -119,6 +121,7 @@ class VerifierPiecewiseQuadratic(Verifier):
         self._check_region(
             problem.unsafe, IssueKind.UNSAFE, problem.beta, maximum=False
         )
+        self._check_domain_boundary()
         self._check_generator()
         self._check_faces()
         if self.issues:
@@ -185,6 +188,43 @@ class VerifierPiecewiseQuadratic(Verifier):
             self.issues.append(
                 VerificationIssue(
                     IssueKind.GENERATOR, worst[1], worst[0], bound, (worst[2],)
+                )
+            )
+
+    def _check_domain_boundary(self):
+        """Require V >= beta on the non-target part of every domain edge."""
+        problem = self.reach_avoid_problem
+        worst = None
+        for edge in _rectangle_edges(problem.domain):
+            for cell in self.cells:
+                clipped = _clip_segment_to_cell(edge, cell, self.tolerance)
+                if clipped is None:
+                    continue
+                intervals = _outside_rectangle_parameter_intervals(
+                    clipped, problem.target, self.tolerance
+                )
+                start, end = clipped
+                for lower, upper in intervals:
+                    segment = (
+                        start + lower * (end - start),
+                        start + upper * (end - start),
+                    )
+                    low, _ = _quadratic_segment_extrema(
+                        QuadraticForm(cell.Q, cell.p, cell.c),
+                        segment,
+                        self.tolerance,
+                    )
+                    if worst is None or low[0] < worst[0]:
+                        worst = low[0], low[1], cell.index, segment
+        if worst is not None and worst[0] < problem.beta - self.tolerance:
+            self.issues.append(
+                VerificationIssue(
+                    IssueKind.DOMAIN_BOUNDARY,
+                    worst[1],
+                    worst[0],
+                    problem.beta,
+                    (worst[2],),
+                    worst[3],
                 )
             )
 
@@ -278,6 +318,36 @@ def _face_issue(kind, data, bound):
 def _rectangle_polygon(rectangle):
     lo, hi = rectangle.lower, rectangle.upper
     return np.array([[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]]])
+
+
+def _rectangle_edges(rectangle):
+    polygon = _rectangle_polygon(rectangle)
+    return list(zip(polygon, np.roll(polygon, -1, axis=0)))
+
+
+def _clip_segment_to_cell(segment, cell, tolerance):
+    """Clip a line segment against a cell's halfspace representation."""
+    start, end = (np.asarray(point, dtype=float) for point in segment)
+    direction = end - start
+    lower, upper = 0.0, 1.0
+    for normal, bound in zip(cell.A, cell.b):
+        offset = float(bound - normal @ start)
+        rate = float(normal @ direction)
+        if abs(rate) <= tolerance:
+            if offset < -tolerance:
+                return None
+            continue
+        crossing = offset / rate
+        if rate > 0.0:
+            upper = min(upper, crossing)
+        else:
+            lower = max(lower, crossing)
+        if lower > upper + tolerance:
+            return None
+    lower, upper = max(0.0, lower), min(1.0, upper)
+    if lower > upper + tolerance:
+        return None
+    return start + lower * direction, start + upper * direction
 
 
 def _cell_rectangle_polygon(cell, rectangle, tolerance):

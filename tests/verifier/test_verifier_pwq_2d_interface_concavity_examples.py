@@ -70,6 +70,7 @@ def _verify(cells, problem, monkeypatch: pytest.MonkeyPatch):
     verifier.sublevel_max_depth = 12
     verifier._unresolved = False
     verifier.issues = []
+    verifier._check_domain_boundary = lambda: None
     monkeypatch.setattr(
         verifier_qwl,
         "check_supremum_of_generator_on_cell_below_eps",

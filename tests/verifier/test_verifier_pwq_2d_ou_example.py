@@ -15,6 +15,7 @@ from tanaka_certificates.nn.last_layer_activation import (
 )
 from tanaka_certificates.problems import make_piecewise_quadratic_ou_2d_problem
 from tanaka_certificates.verifier import (
+    IssueKind,
     VerificationResult,
     VerifierPiecewiseQuadratic,
 )
@@ -42,7 +43,7 @@ def _ou_example_certificate():
     return certificate
 
 
-def test_verifier_accepts_two_cell_ou_example_certificate():
+def test_verifier_rejects_two_cell_ou_example_at_domain_boundary():
     sde, problem = make_piecewise_quadratic_ou_2d_problem()
     verifier = VerifierPiecewiseQuadratic(
         sde,
@@ -50,5 +51,8 @@ def test_verifier_accepts_two_cell_ou_example_certificate():
         _ou_example_certificate(),
     )
 
-    assert verifier.verify() is VerificationResult.VERIFIED
-    assert verifier.issues == []
+    assert verifier.verify() is VerificationResult.NOT_VERIFIED
+    boundary_issue = next(
+        issue for issue in verifier.issues if issue.kind is IssueKind.DOMAIN_BOUNDARY
+    )
+    assert boundary_issue.value < problem.beta
