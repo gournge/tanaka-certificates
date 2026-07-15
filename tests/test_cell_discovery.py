@@ -3,10 +3,79 @@ import pytest
 
 from tanaka_certificates.cell_discovery import (
     Cell,
+    FeasibilityStatus,
+    classify_full_dimensional_interior,
     discover_1d_cells_from_network_weights,
+    discover_cells_result_from_network_weights,
     discover_cells_from_network_weights,
 )
 from tanaka_certificates.nn.last_layer_activation import PiecewiseQuadratic1D
+
+
+def test_feasibility_classification_keeps_thin_region_unresolved():
+    status = classify_full_dimensional_interior(
+        np.array([[-1.0, 0.0], [1.0, 0.0]]),
+        np.array([0.0, 5e-10]),
+        dimension=2,
+    )
+
+    assert status is FeasibilityStatus.UNKNOWN
+
+
+def test_feasibility_classification_handles_almost_parallel_thin_wedge():
+    status = classify_full_dimensional_interior(
+        np.array(
+            [
+                [-1.0, 0.0],
+                [1.0, 0.0],
+                [0.0, -1.0],
+                [-1e-12, 1.0],
+            ]
+        ),
+        np.array([0.0, 1.0, 0.0, 0.0]),
+        dimension=2,
+    )
+
+    assert status is FeasibilityStatus.UNKNOWN
+
+
+def test_feasibility_classification_handles_zero_and_redundant_constraints():
+    assert classify_full_dimensional_interior(
+        np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 0.0]]),
+        np.array([0.0, 1.0, 1.0]),
+        dimension=2,
+    ) is FeasibilityStatus.FEASIBLE
+    assert classify_full_dimensional_interior(
+        np.array([[0.0, 0.0]]),
+        np.array([-np.finfo(float).tiny]),
+        dimension=2,
+    ) is FeasibilityStatus.INFEASIBLE
+    assert classify_full_dimensional_interior(
+        np.array([[1e-15, 0.0]]),
+        np.array([-1.0]),
+        dimension=2,
+    ) is FeasibilityStatus.FEASIBLE
+
+
+def test_generic_discovery_reports_narrow_relu_pattern_as_unresolved():
+    activation = PiecewiseQuadratic1D(
+        intervals=[(-np.inf, np.inf)], Qs=[0.0], ps=[1.0], cs=[0.0]
+    )
+    result = discover_cells_result_from_network_weights(
+        [
+            (
+                np.array([[1.0, 0.0], [1.0, 0.0]]),
+                np.array([0.0, -5e-10]),
+            ),
+            (np.array([[1.0, 1.0]]), np.array([0.0])),
+        ],
+        lam=np.ones(1),
+        c=0.0,
+        piecewise_quadratic_activation=activation,
+    )
+
+    assert not result.is_complete
+    assert any(region.stage == "relu_layer_0" for region in result.unresolved_regions)
 
 
 def _find_unique_cell_containing(

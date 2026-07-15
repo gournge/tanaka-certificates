@@ -88,6 +88,27 @@ def test_linear_piece_passes_all_pwq_checks():
     assert verifier.issues == []
 
 
+def test_ambiguous_thin_output_cell_makes_exact_verifier_unknown():
+    activation = PiecewiseQuadratic1D(
+        intervals=[(-np.inf, 0.0), (0.0, 5e-10), (5e-10, np.inf)],
+        Qs=[0.0, 0.0, 0.0],
+        ps=[1.0, 1.0, 1.0],
+        cs=[0.0, 0.0, 0.0],
+    )
+    verifier = VerifierPiecewiseQuadratic(
+        IsotropicOrnsteinUhlenbeck(2, volatility=0.5),
+        _problem(),
+        _one_layer_certificate([1.0, 0.0], 0.0, activation),
+    )
+    verifier._check_region = lambda *args, **kwargs: None
+    verifier._check_domain_boundary = lambda: None
+    verifier._check_generator = lambda: None
+    verifier._check_faces = lambda: None
+
+    assert not verifier.cell_discovery.is_complete
+    assert verifier.verify() is VerificationResult.UNKNOWN
+
+
 def test_generator_failure_records_counterexample():
     sde = IsotropicOrnsteinUhlenbeck(2, volatility=0.5)
     verifier = VerifierPiecewiseQuadratic(

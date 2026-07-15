@@ -140,8 +140,9 @@ class ConstantDriftBrownian2D(SDEND):
         return self.diffusion_scale * np.eye(2)
 
 
-def make_piecewise_quadratic_2d_verification_problem(
-) -> tuple[ConstantDriftBrownian2D, ReachAvoidProblem]:
+def make_piecewise_quadratic_2d_verification_problem() -> (
+    tuple[ConstantDriftBrownian2D, ReachAvoidProblem]
+):
     """Return the explicit 2D PWQ verification example from the report."""
     sde = ConstantDriftBrownian2D(drift=(1.0, 0.0), diffusion_scale=np.sqrt(2.0))
     problem = ReachAvoidProblem(
@@ -177,8 +178,51 @@ def make_ou_problem(
     return sde, problem
 
 
-def make_piecewise_quadratic_ou_2d_problem(
+def make_easy_ou_problem(
+    alpha: float = 1.5,
 ) -> tuple[IsotropicOrnsteinUhlenbeck, ReachAvoidProblem]:
+    """Return the two-dimensional Ornstein--Uhlenbeck reach-avoid problem."""
+    sde = IsotropicOrnsteinUhlenbeck(2, volatility=0.5)
+    problem = ReachAvoidProblem(
+        domain=create_hyperrectangle([-1.0, -2.25], [2.25, 0.75]),
+        initial=create_hyperrectangle([0.9, -1.1], [1.1, -0.9]),
+        unsafe=HyperrectangleUnion(
+            create_hyperrectangle([-0.75, -0.5], [-0.1, 0.25]),
+        ),
+        target=create_hyperrectangle([-0.1, -0.1], [0.1, 0.1]),
+        alpha=alpha,
+        beta=2.0,
+        epsilon=0.1,
+    )
+    return sde, problem
+
+
+def make_radial_ou_training_problem(
+) -> tuple[IsotropicOrnsteinUhlenbeck, ReachAvoidProblem]:
+    """Return an OU benchmark with the known certificate V=0.6||x||^2."""
+    sde = IsotropicOrnsteinUhlenbeck(2, volatility=0.5)
+    domain = create_hyperrectangle([-2.0, -2.0], [2.0, 2.0])
+    unsafe = HyperrectangleUnion(
+        create_hyperrectangle([-2.0, -2.0], [-1.85, 2.0]),
+        create_hyperrectangle([1.85, -2.0], [2.0, 2.0]),
+        create_hyperrectangle([-2.0, -2.0], [2.0, -1.85]),
+        create_hyperrectangle([-2.0, 1.85], [2.0, 2.0]),
+    )
+    problem = ReachAvoidProblem(
+        domain=domain,
+        initial=create_hyperrectangle([0.9, -0.1], [1.1, 0.1]),
+        unsafe=unsafe,
+        target=create_hyperrectangle([-0.6, -0.6], [0.6, 0.6]),
+        alpha=0.8,
+        beta=2.0,
+        epsilon=0.1,
+    )
+    return sde, problem
+
+
+def make_piecewise_quadratic_ou_2d_problem() -> (
+    tuple[IsotropicOrnsteinUhlenbeck, ReachAvoidProblem]
+):
     """Return a hand-verifiable two-cell PWQ Ornstein--Uhlenbeck problem."""
     sde = IsotropicOrnsteinUhlenbeck(2, volatility=0.5)
     problem = ReachAvoidProblem(

@@ -1,0 +1,354 @@
+\section{The local-time condition by construction}
+\label{sec:local-time-by-construction}
+
+This section proves that the deep ReLU input-convex neural network used in the
+certificate architecture enforces the required sign of the local-time term by
+construction.  The relevant point is a sign convention: the network
+\(C_\psi\) defined below is convex, and hence its gradient jump across an
+activation interface has the convex sign.  Therefore the supermartingale
+certificate uses the residual form
+\[
+    V_\theta(x)=S_\theta(x)-C_\psi(x),
+\]
+where \(S_\theta\) is continuously differentiable.  The branch
+\(-C_\psi\), rather than \(C_\psi\) itself, then satisfies the nonpositive
+normal-derivative jump condition required by the It\^o--Tanaka formula.
+
+\subsection{The deep ReLU ICNN}
+
+Let \(x\in\mathbb R^d\).  Consider a network with \(L\geq 1\) hidden layers,
+all of width \(m\), defined recursively by
+\begin{align}
+    z_1(x)
+    &=
+    \operatorname{ReLU}(U_1x+b_1),
+    \\
+    z_{\ell}(x)
+    &=
+    \operatorname{ReLU}
+    \bigl(U_{\ell}x+b_{\ell}+W_{\ell}z_{\ell-1}(x)\bigr),
+    \qquad \ell=2,\dots,L,
+\end{align}
+and with scalar output
+\begin{equation}
+    C_\psi(x)
+    =
+    u^\top x+c+w^\top z_L(x).
+    \label{eq:deep-relu-icnn}
+\end{equation}
+The input matrices \(U_\ell\), biases \(b_\ell\), output input weight \(u\),
+and output bias \(c\) are unrestricted.  The recurrent matrices and final
+hidden-to-output weights satisfy
+\begin{equation}
+    W_\ell\geq 0,
+    \qquad
+    w\geq 0,
+    \label{eq:icnn-nonnegative-weights}
+\end{equation}
+entrywise.
+
+In the implementation, these inequalities hold for every parameter value
+because
+\[
+    W_\ell=\operatorname{softplus}(\widetilde W_\ell),
+    \qquad
+    w=\operatorname{softplus}(\widetilde w).
+\]
+Since \(\operatorname{softplus}(r)>0\) for every finite \(r\), the effective
+weights are nonnegative without requiring a constrained optimization step.
+
+\begin{proposition}[Convexity and piecewise-affine structure]
+\label{prop:deep-relu-icnn-convex}
+The function \(C_\psi:\mathbb R^d\to\mathbb R\) defined by
+\eqref{eq:deep-relu-icnn}--\eqref{eq:icnn-nonnegative-weights} is finite,
+continuous, convex, and piecewise affine.
+\end{proposition}
+
+\begin{proof}
+We prove convexity by induction over the hidden layers.
+
+For the first layer, each coordinate has the form
+\[
+    (z_1)_k(x)
+    =
+    \max\{0,\,a_k^\top x+\beta_k\},
+\]
+which is the maximum of two affine functions and is therefore convex.
+Consequently every coordinate of \(z_1\) is convex.
+
+Suppose that every coordinate of \(z_{\ell-1}\) is convex.  For a fixed
+coordinate \(k\) of the next preactivation, write
+\[
+    q_{\ell,k}(x)
+    =
+    (U_\ell x+b_\ell)_k
+    +
+    \sum_{r=1}^m (W_\ell)_{kr}(z_{\ell-1})_r(x).
+\]
+The first term is affine.  Every coefficient \((W_\ell)_{kr}\) is
+nonnegative, so the second term is a nonnegative linear combination of convex
+functions.  Thus \(q_{\ell,k}\) is convex.  Because ReLU is convex and
+nondecreasing,
+\[
+    (z_\ell)_k(x)
+    =
+    \operatorname{ReLU}(q_{\ell,k}(x))
+\]
+is convex.  This completes the induction.
+
+Finally,
+\[
+    C_\psi(x)
+    =
+    u^\top x+c+
+    \sum_{k=1}^m w_k(z_L)_k(x)
+\]
+is the sum of an affine function and a nonnegative linear combination of
+convex functions, and is therefore convex.
+
+Every operation in the network is obtained from affine maps, finite sums, and
+coordinatewise ReLU.  Hence the network is continuous and piecewise affine,
+with finitely many affine pieces.
+\end{proof}
+
+\subsection{Convexity determines the interface sign}
+
+Let \(K_i\) and \(K_j\) be two full-dimensional affine regions of
+\(C_\psi\) that share a codimension-one face \(F\).  On the two regions,
+write
+\[
+    C_\psi(x)=a_i^\top x+c_i,
+    \qquad x\in K_i,
+\]
+and
+\[
+    C_\psi(x)=a_j^\top x+c_j,
+    \qquad x\in K_j.
+\]
+Let \(n_{i\to j,F}\) be a unit normal to \(F\) pointing from \(K_i\) into
+\(K_j\).
+
+\begin{lemma}[Normal derivative jump of a convex CPWL function]
+\label{lem:convex-normal-jump}
+For every shared face \(F\),
+\begin{equation}
+    (a_j-a_i)\cdot n_{i\to j,F}\geq 0.
+    \label{eq:convex-normal-jump}
+\end{equation}
+Equivalently,
+\[
+    \bigl(\nabla C_{\psi,j}(x)-\nabla C_{\psi,i}(x)\bigr)
+    \cdot n_{i\to j,F}
+    \geq 0,
+    \qquad x\in\operatorname{relint}(F).
+\]
+\end{lemma}
+
+\begin{proof}
+Choose \(x_0\in\operatorname{relint}(F)\).  Since the two affine pieces agree
+on \(F\), their difference vanishes on every tangent direction to \(F\).
+Therefore \(a_j-a_i\) is normal to \(F\), so there exists
+\(\lambda\in\mathbb R\) such that
+\[
+    a_j-a_i=\lambda n_{i\to j,F}.
+\]
+It remains to prove \(\lambda\geq 0\).
+
+For sufficiently small \(\varepsilon>0\), the points
+\[
+    x_-=x_0-\varepsilon n_{i\to j,F}\in K_i,
+    \qquad
+    x_+=x_0+\varepsilon n_{i\to j,F}\in K_j.
+\]
+Restrict \(C_\psi\) to the line
+\[
+    g(t)=C_\psi(x_0+t n_{i\to j,F}).
+\]
+Because \(C_\psi\) is convex, \(g\) is a convex function of one variable.
+Its left and right derivatives at zero are
+\[
+    g'_-(0)=a_i\cdot n_{i\to j,F},
+    \qquad
+    g'_+(0)=a_j\cdot n_{i\to j,F}.
+\]
+The one-dimensional derivative of a convex function is nondecreasing, hence
+\[
+    a_i\cdot n_{i\to j,F}
+    \leq
+    a_j\cdot n_{i\to j,F}.
+\]
+This is exactly \eqref{eq:convex-normal-jump}.
+\end{proof}
+
+\subsection{The residual certificate}
+
+We now consider the certificate
+\begin{equation}
+    V_\theta(x)
+    =
+    \rho\bigl(S_\theta(x)-C_\psi(x)\bigr),
+    \qquad \rho>0,
+    \label{eq:residual-icnn-certificate}
+\end{equation}
+where \(S_\theta\in C^1\).  In the implementation, \(S_\theta\) is the
+shallow piecewise-quadratic network
+\[
+    S_\theta(x)
+    =
+    c+p^\top x+\frac12x^\top Hx
+    +\frac12\sum_{k=1}^M
+    v_k\operatorname{ReLU}(a_k^\top x+b_k)^2.
+\]
+Since the scalar function \(r\mapsto \tfrac12\operatorname{ReLU}(r)^2\) is
+continuously differentiable, \(S_\theta\) has no gradient jump across any of
+its activation hyperplanes.
+
+The common refinement of the activation regions of \(S_\theta\) and
+\(C_\psi\) is a finite polyhedral partition.  Let \(R_i\) and \(R_j\) be
+adjacent full-dimensional cells of this refinement, sharing a face \(F\), and
+let \(n_{i\to j,F}\) point from \(R_i\) to \(R_j\).
+
+\begin{theorem}[Local-time condition by construction]
+\label{thm:deep-relu-icnn-local-time}
+For every choice of the unconstrained parameters of \(S_\theta\) and
+\(C_\psi\), every choice of raw recurrent and output parameters, and every
+adjacent pair of cells in the common refinement, the certificate
+\eqref{eq:residual-icnn-certificate} satisfies
+\begin{equation}
+    \bigl(
+        \nabla V_{\theta,j}(x)-\nabla V_{\theta,i}(x)
+    \bigr)
+    \cdot n_{i\to j,F}
+    \leq 0,
+    \qquad x\in\operatorname{relint}(F).
+    \label{eq:local-time-condition-by-construction}
+\end{equation}
+Consequently, every codimension-one local-time contribution in the
+multidimensional It\^o--Tanaka formula for \(V_\theta(X_t)\) is nonpositive.
+No activation-region enumeration or pairwise interface verification is needed
+to establish this sign.
+\end{theorem}
+
+\begin{proof}
+On the two sides of \(F\),
+\[
+    \nabla V_{\theta,i}
+    =
+    \rho\bigl(\nabla S_{\theta,i}-\nabla C_{\psi,i}\bigr),
+    \qquad
+    \nabla V_{\theta,j}
+    =
+    \rho\bigl(\nabla S_{\theta,j}-\nabla C_{\psi,j}\bigr).
+\]
+Therefore
+\begin{align}
+    &\bigl(
+        \nabla V_{\theta,j}-\nabla V_{\theta,i}
+    \bigr)\cdot n_{i\to j,F}
+    \\
+    &\qquad=
+    \rho
+    \bigl(
+        \nabla S_{\theta,j}-\nabla S_{\theta,i}
+    \bigr)\cdot n_{i\to j,F}
+    -
+    \rho
+    \bigl(
+        \nabla C_{\psi,j}-\nabla C_{\psi,i}
+    \bigr)\cdot n_{i\to j,F}.
+    \label{eq:residual-jump-decomposition}
+\end{align}
+
+Because \(S_\theta\in C^1\), its gradient is continuous across every face of
+the common refinement.  Hence
+\[
+    \nabla S_{\theta,j}(x)-\nabla S_{\theta,i}(x)=0,
+    \qquad x\in F.
+\]
+If \(F\) is introduced only by the smooth branch, then
+\(C_\psi\) is affine on both sides and its gradient jump is also zero.  If
+\(F\) lies on an activation interface of \(C_\psi\), Lemma
+\ref{lem:convex-normal-jump} gives
+\[
+    \bigl(
+        \nabla C_{\psi,j}(x)-\nabla C_{\psi,i}(x)
+    \bigr)\cdot n_{i\to j,F}
+    \geq 0.
+\]
+Substituting these facts into \eqref{eq:residual-jump-decomposition}, and using
+\(\rho>0\), yields
+\[
+    \bigl(
+        \nabla V_{\theta,j}(x)-\nabla V_{\theta,i}(x)
+    \bigr)\cdot n_{i\to j,F}
+    =
+    -\rho
+    \bigl(
+        \nabla C_{\psi,j}(x)-\nabla C_{\psi,i}(x)
+    \bigr)\cdot n_{i\to j,F}
+    \leq 0.
+\]
+This proves \eqref{eq:local-time-condition-by-construction}.
+
+In the multidimensional It\^o--Tanaka formula, the contribution of \(F\) is
+\[
+    \frac12
+    \int_0^t
+    \bigl(
+        \nabla V_{\theta,j}(X_s)-\nabla V_{\theta,i}(X_s)
+    \bigr)
+    \cdot n_{i\to j,F}\,dL_s^F.
+\]
+Surface local time is nondecreasing, so \(dL_s^F\) is a nonnegative measure.
+The integrand is nonpositive by the preceding argument; therefore the entire
+integral is nonpositive.  Summing over all faces preserves this sign.
+\end{proof}
+
+\begin{corollary}[Max-affine specialization]
+\label{cor:max-affine-local-time}
+The conclusion of Theorem~\ref{thm:deep-relu-icnn-local-time} also holds when
+the convex branch is
+\[
+    C_\psi(x)=\max_{1\leq r\leq R}\{a_r^\top x+b_r\}.
+\]
+In particular, it applies to the residual max-affine certificate used in the
+initial radial Ornstein--Uhlenbeck training experiment.
+\end{corollary}
+
+\begin{proof}
+A finite maximum of affine functions is finite, continuous, convex, and
+piecewise affine.  The proof of
+Theorem~\ref{thm:deep-relu-icnn-local-time} uses no other property of
+\(C_\psi\), so it applies unchanged.
+\end{proof}
+
+\begin{remark}[What is and is not guaranteed]
+The theorem concerns only the singular, interface part of the generalized
+It\^o formula.  It does not by itself imply that \(V_\theta(X_t)\) is a
+supermartingale.  One must still verify the interior generator inequality,
+for example
+\[
+    \mathcal LV_{\theta,i}(x)\leq 0
+\]
+on every relevant smooth cell, together with the required boundary,
+separation, stopping, and stochastic-integrability conditions.  The
+architecture removes the combinatorial verification of the local-time sign;
+it does not remove the ordinary generator verification problem.
+\end{remark}
+
+\begin{remark}[Distributional-Hessian interpretation]
+The result can be stated without referring to a particular activation-region
+partition.  A finite convex piecewise-affine function has a positive
+semidefinite singular Hessian measure.  Since \(S_\theta\in C^1\), it has no
+codimension-one singular Hessian mass, and therefore
+\[
+    D^2_{\mathrm{sing}}V_\theta
+    =
+    -\rho D^2C_\psi
+    \preceq 0.
+\]
+Thus the architecture enforces nonpositive singular curvature globally.  The
+facewise normal-jump condition in
+\eqref{eq:local-time-condition-by-construction} is the polyhedral expression
+of this measure inequality.
+\end{remark}
