@@ -37,7 +37,7 @@ import numpy as np
 
 from tanaka_certificates.certificate import PiecewiseQuadraticCertificate
 from tanaka_certificates.cell_discovery import (
-    discover_cells_from_certificate,
+    discover_cells_result_from_certificate,
 )
 from tanaka_certificates.ra import ReachAvoidProblem
 from tanaka_certificates.regions import Hyperrectangle
@@ -66,7 +66,8 @@ class VerifierPiecewiseQuadraticNumerical(Verifier):
             raise ValueError("verification resolutions must be at least 3")
         if not isinstance(reach_avoid_problem.domain, Hyperrectangle):
             raise TypeError("the verification domain must be a Hyperrectangle")
-        self.cells = discover_cells_from_certificate(certificate)
+        self.cell_discovery = discover_cells_result_from_certificate(certificate)
+        self.cells = self.cell_discovery.cells
         self.grid_resolution = grid_resolution
         self.face_resolution = face_resolution
         self.tolerance = tolerance
@@ -80,7 +81,13 @@ class VerifierPiecewiseQuadraticNumerical(Verifier):
         self._check_domain_boundary()
         self._check_generator()
         self._check_faces()
-        return VerificationResult.NOT_VERIFIED if self.issues else VerificationResult.VERIFIED
+        if self.issues:
+            return VerificationResult.NOT_VERIFIED
+        return (
+            VerificationResult.VERIFIED
+            if self.cell_discovery.is_complete
+            else VerificationResult.UNKNOWN
+        )
 
     def _check_region(self, region, kind, bound, *, maximum):
         points = self._region_points(region)

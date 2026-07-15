@@ -181,27 +181,37 @@ class LocalTimeByConstructionCertificate(Certificate):
         )
 
     def discover_cells(self) -> list[Cell]:
-        """Return the exact full-dimensional PWQ cells of this architecture."""
-        from tanaka_certificates.cell_discovery import Cell
+        """Compatibility wrapper returning conclusively discovered cells."""
+        return self.discover_cells_result().cells
 
-        regions = _smooth_regions(self.smooth)
+    def discover_cells_result(self) -> CellDiscoveryResult:
+        """Return cells and every numerically ambiguous candidate region."""
+        from tanaka_certificates.cell_discovery import Cell, CellDiscoveryResult
+
+        regions, unresolved = _smooth_regions(self.smooth)
         if isinstance(self.convex_kink, DeepReLUICNN):
-            regions = _subtract_icnn(regions, self.convex_kink)
+            regions, new_unresolved = _subtract_icnn(regions, self.convex_kink)
         elif isinstance(self.convex_kink, MaxAffineConvex):
-            regions = _subtract_max_affine(regions, self.convex_kink)
+            regions, new_unresolved = _subtract_max_affine(
+                regions, self.convex_kink
+            )
         else:  # Defensive: the verifier also checks the structural predicate.
             raise TypeError("unsupported convex kink branch")
-        return [
-            Cell(
-                i,
-                float(self.output_scale) * region.Q,
-                float(self.output_scale) * region.p,
-                float(self.output_scale) * region.c,
-                region.A,
-                region.b,
-            )
-            for i, region in enumerate(regions)
-        ]
+        unresolved.extend(new_unresolved)
+        return CellDiscoveryResult(
+            [
+                Cell(
+                    i,
+                    float(self.output_scale) * region.Q,
+                    float(self.output_scale) * region.p,
+                    float(self.output_scale) * region.c,
+                    region.A,
+                    region.b,
+                )
+                for i, region in enumerate(regions)
+            ],
+            unresolved,
+        )
 
 
 class ResidualDeepICNNCertificate(LocalTimeByConstructionCertificate):
@@ -276,26 +286,43 @@ def _numpy(parameter: torch.Tensor) -> np.ndarray:
     return parameter.detach().cpu().numpy().astype(float, copy=True)
 
 
-def _feasible(region: _PWQRegion, additional_A, additional_b) -> _PWQRegion | None:
-    from tanaka_certificates.cell_discovery import _has_full_dimensional_interior
+def _candidate_region(region: _PWQRegion, additional_A, additional_b):
+    from tanaka_certificates.cell_discovery import classify_full_dimensional_interior
 
     dimension = len(region.p)
     A = np.vstack((region.A, np.asarray(additional_A).reshape(-1, dimension)))
     b = np.r_[region.b, np.asarray(additional_b, dtype=float)]
-    if not _has_full_dimensional_interior(A, b, dimension=dimension):
-        return None
-    return _PWQRegion(
-        region.Q.copy(),
-        region.p.copy(),
-        region.c,
-        A,
-        b,
-        None if region.affine_matrix is None else region.affine_matrix.copy(),
-        None if region.affine_bias is None else region.affine_bias.copy(),
+    return (
+        classify_full_dimensional_interior(A, b, dimension=dimension),
+        _PWQRegion(
+            region.Q.copy(),
+            region.p.copy(),
+            region.c,
+            A,
+            b,
+            None if region.affine_matrix is None else region.affine_matrix.copy(),
+            None if region.affine_bias is None else region.affine_bias.copy(),
+        ),
     )
 
 
-def _smooth_regions(smooth: SmoothHingePWQ) -> list[_PWQRegion]:
+def _append_candidate(children, unresolved, status, child, stage):
+    from tanaka_certificates.cell_discovery import (
+        FeasibilityStatus,
+        UnresolvedRegion,
+    )
+
+    if status is FeasibilityStatus.FEASIBLE:
+        children.append(child)
+        return True
+    if status is FeasibilityStatus.UNKNOWN:
+        unresolved.append(UnresolvedRegion(child.A, child.b, stage))
+    return False
+
+
+def _smooth_regions(
+    smooth: SmoothHingePWQ,
+) -> tuple[list[_PWQRegion], list[UnresolvedRegion]]:
     dimension = smooth.input_dim
     H = _numpy(smooth.hessian)
     regions = [
@@ -310,52 +337,64 @@ def _smooth_regions(smooth: SmoothHingePWQ) -> list[_PWQRegion]:
     weights = _numpy(smooth.hinge.weight)
     biases = _numpy(smooth.hinge.bias)
     coefficients = _numpy(smooth.effective_hinge_coefficients)
-    for normal, bias, coefficient in zip(weights, biases, coefficients):
+    unresolved: list[UnresolvedRegion] = []
+    for hinge_index, (normal, bias, coefficient) in enumerate(
+        zip(weights, biases, coefficients)
+    ):
         children = []
         for region in regions:
-            inactive = _feasible(region, [normal], [-bias])
-            if inactive is not None:
-                children.append(inactive)
-            active = _feasible(region, [-normal], [bias])
-            if active is not None:
+            status, inactive = _candidate_region(region, [normal], [-bias])
+            _append_candidate(
+                children, unresolved, status, inactive, f"smooth_hinge_{hinge_index}"
+            )
+            status, active = _candidate_region(region, [-normal], [bias])
+            if _append_candidate(
+                children, unresolved, status, active, f"smooth_hinge_{hinge_index}"
+            ):
                 active.Q += coefficient * np.outer(normal, normal)
                 active.p += coefficient * bias * normal
                 active.c += 0.5 * coefficient * bias**2
-                children.append(active)
         regions = children
-    return regions
+    return regions, unresolved
 
 
-def _split_relu_regions(regions, preactivation):
+def _split_relu_regions(regions, preactivation, stage):
     children = []
+    unresolved = []
     for region in regions:
         matrix, bias = preactivation(region)
         for pattern in product((False, True), repeat=len(bias)):
             signs = np.asarray(pattern, dtype=float)
             additional_A = np.where(signs[:, None] > 0, -matrix, matrix)
             additional_b = np.where(signs > 0, bias, -bias)
-            child = _feasible(region, additional_A, additional_b)
-            if child is not None:
+            status, child = _candidate_region(region, additional_A, additional_b)
+            if _append_candidate(children, unresolved, status, child, stage):
                 diagonal = np.diag(signs)
                 child.affine_matrix = diagonal @ matrix
                 child.affine_bias = diagonal @ bias
-                children.append(child)
-    return children
+    return children, unresolved
 
 
 def _subtract_icnn(regions, icnn: DeepReLUICNN):
+    unresolved = []
     first = icnn.input_layers[0]
     W, bias = _numpy(first.weight), _numpy(first.bias)
-    regions = _split_relu_regions(regions, lambda _: (W, bias))
-    for layer, recurrent in zip(
-        icnn.input_layers[1:], icnn.positive_recurrent_weights()
+    regions, new_unresolved = _split_relu_regions(
+        regions, lambda _: (W, bias), "icnn_relu_0"
+    )
+    unresolved.extend(new_unresolved)
+    for layer_index, (layer, recurrent) in enumerate(
+        zip(icnn.input_layers[1:], icnn.positive_recurrent_weights()), start=1
     ):
         U, bias, Z = _numpy(layer.weight), _numpy(layer.bias), _numpy(recurrent)
 
         def preactivation(region, U=U, bias=bias, Z=Z):
             return Z @ region.affine_matrix + U, Z @ region.affine_bias + bias
 
-        regions = _split_relu_regions(regions, preactivation)
+        regions, new_unresolved = _split_relu_regions(
+            regions, preactivation, f"icnn_relu_{layer_index}"
+        )
+        unresolved.extend(new_unresolved)
     output_weight = _numpy(F.softplus(icnn.raw_output_weights))
     input_weight = _numpy(icnn.output_input.weight[0])
     output_bias = float(icnn.output_input.bias.detach()[0])
@@ -363,22 +402,24 @@ def _subtract_icnn(regions, icnn: DeepReLUICNN):
         region.p -= output_weight @ region.affine_matrix + input_weight
         region.c -= float(output_weight @ region.affine_bias + output_bias)
         region.affine_matrix = region.affine_bias = None
-    return regions
+    return regions, unresolved
 
 
 def _subtract_max_affine(regions, maximum: MaxAffineConvex):
     weights, biases = _numpy(maximum.affine.weight), _numpy(maximum.affine.bias)
     result = []
+    unresolved = []
     for region in regions:
         for index, (weight, bias) in enumerate(zip(weights, biases)):
             # This cut is maximal when every other cut is no larger.
-            child = _feasible(
+            status, child = _candidate_region(
                 region,
                 weights - weight,
                 bias - biases,
             )
-            if child is not None:
+            if _append_candidate(
+                result, unresolved, status, child, f"max_affine_piece_{index}"
+            ):
                 child.p -= weight
                 child.c -= float(bias)
-                result.append(child)
-    return result
+    return result, unresolved

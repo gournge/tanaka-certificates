@@ -47,7 +47,7 @@ import numpy as np
 from tanaka_certificates.certificate import PiecewiseQuadraticCertificate
 from tanaka_certificates.cell_discovery import (
     Cell,
-    discover_cells_from_certificate,
+    discover_cells_result_from_certificate,
 )
 from tanaka_certificates.generator_supremum import (
     QuadraticForm,
@@ -108,17 +108,19 @@ class VerifierPiecewiseQuadratic(Verifier):
             raise ValueError("the exact PWQ baseline currently supports 2D SDEs")
         if not isinstance(reach_avoid_problem.domain, Hyperrectangle):
             raise TypeError("the verification domain must be a Hyperrectangle")
-        self.cells = discover_cells_from_certificate(certificate)
+        self.cell_discovery = discover_cells_result_from_certificate(certificate)
+        self.cells = self.cell_discovery.cells
         self.tolerance = tolerance
         if sublevel_max_depth < 0:
             raise ValueError("sublevel_max_depth must be nonnegative")
         self.sublevel_max_depth = sublevel_max_depth
-        self._unresolved = False
+        self._unresolved = not self.cell_discovery.is_complete
         self.issues: list[VerificationIssue] = []
 
     def verify(self) -> VerificationResult:
         self.issues = []
-        self._unresolved = False
+        discovery = getattr(self, "cell_discovery", None)
+        self._unresolved = discovery is not None and not discovery.is_complete
         problem = self.reach_avoid_problem
         self._check_region(
             problem.domain, IssueKind.NONNEGATIVITY, 0.0, maximum=False

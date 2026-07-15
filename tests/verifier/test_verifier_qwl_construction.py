@@ -70,6 +70,37 @@ def test_construction_verifier_reports_negative_domain_value():
     assert issue.margin == 1.0
 
 
+def test_ambiguous_smooth_hinge_strip_makes_construction_verifier_unknown():
+    certificate = ResidualMaxAffineCertificate(
+        2, smooth_width=2, max_affine_pieces=1
+    )
+    with torch.no_grad():
+        certificate.smooth.hinge.weight.copy_(
+            torch.tensor([[1.0, 0.0], [1.0, 0.0]])
+        )
+        certificate.smooth.hinge.bias.copy_(torch.tensor([0.0, -5e-10]))
+        certificate.convex_kink.affine.weight.zero_()
+        certificate.convex_kink.affine.bias.zero_()
+    problem = ReachAvoidProblem(
+        domain=create_hyperrectangle([-1.0, -1.0], [1.0, 1.0]),
+        initial=create_hyperrectangle([-0.9, -0.1], [-0.8, 0.1]),
+        unsafe=create_hyperrectangle([0.8, -0.1], [0.9, 0.1]),
+        target=create_hyperrectangle([-0.1, -0.1], [0.1, 0.1]),
+        alpha=1.0,
+        beta=2.0,
+        epsilon=0.1,
+    )
+    verifier = VerifierLocalTimeByConstruction(
+        IsotropicOrnsteinUhlenbeck(2, volatility=0.5), problem, certificate
+    )
+    verifier._check_region = lambda *args, **kwargs: None
+    verifier._check_domain_boundary = lambda: None
+    verifier._check_generator = lambda: None
+
+    assert not verifier.cell_discovery.is_complete
+    assert verifier.verify() is VerificationResult.UNKNOWN
+
+
 def test_generator_is_checked_inside_each_discovered_pwq_cell():
     r"""A smooth hinge must contribute its active-cell Hessian to ``L V``.
 

@@ -43,6 +43,27 @@ def test_deep_icnn_branch_is_convex():
     assert all(torch.all(weight > 0) for weight in convex.positive_recurrent_weights())
 
 
+def test_nearly_redundant_max_affine_piece_is_reported_as_unresolved():
+    certificate = ResidualMaxAffineCertificate(
+        2, smooth_width=0, max_affine_pieces=3
+    )
+    with torch.no_grad():
+        certificate.convex_kink.affine.weight.copy_(
+            torch.tensor([[-1.0, 0.0], [0.0, 0.0], [1.0, 0.0]])
+        )
+        certificate.convex_kink.affine.bias.copy_(
+            torch.tensor([0.0, 5e-10, 0.0])
+        )
+
+    result = certificate.discover_cells_result()
+
+    assert not result.is_complete
+    assert any(
+        region.stage == "max_affine_piece_1"
+        for region in result.unresolved_regions
+    )
+
+
 @pytest.mark.parametrize(
     "architecture", ("residual_icnn", "residual_max_affine", "unconstrained_pwq")
 )
@@ -63,4 +84,3 @@ def test_shared_trainer_supports_all_architectures(architecture):
     )
     assert certificate(torch.zeros(3, 2)).shape == (3, 1)
     assert certificate.training_artifact.epochs_completed == 1
-

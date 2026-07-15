@@ -45,10 +45,11 @@ class VerifierLocalTimeByConstruction(VerifierPiecewiseQuadratic):
             )
         if sublevel_max_depth < 0:
             raise ValueError("sublevel_max_depth must be nonnegative")
-        self.cells = certificate.discover_cells()
+        self.cell_discovery = certificate.discover_cells_result()
+        self.cells = self.cell_discovery.cells
         self.tolerance = tolerance
         self.sublevel_max_depth = sublevel_max_depth
-        self._unresolved = False
+        self._unresolved = not self.cell_discovery.is_complete
         self.issues = []
 
     @property
@@ -57,7 +58,7 @@ class VerifierLocalTimeByConstruction(VerifierPiecewiseQuadratic):
 
     def verify(self) -> VerificationResult:
         self.issues = []
-        self._unresolved = False
+        self._unresolved = not self.cell_discovery.is_complete
         problem = self.reach_avoid_problem
         self._check_region(
             problem.domain, IssueKind.NONNEGATIVITY, 0.0, maximum=False

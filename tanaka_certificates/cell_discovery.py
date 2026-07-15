@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from itertools import product
 
 import numpy as np
@@ -56,6 +57,35 @@ class Cell:
         if lower > upper + atol:
             raise ValueError("cell represents an empty interval")
         return lower, upper
+
+
+class FeasibilityStatus(str, Enum):
+    """Conservative outcome of a full-dimensional polyhedron check."""
+
+    FEASIBLE = "feasible"
+    INFEASIBLE = "infeasible"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True)
+class UnresolvedRegion:
+    """A candidate cell whose dimension could not be decided reliably."""
+
+    A: np.ndarray
+    b: np.ndarray
+    stage: str
+
+
+@dataclass
+class CellDiscoveryResult:
+    """Discovered cells together with every numerically ambiguous candidate."""
+
+    cells: list[Cell]
+    unresolved_regions: list[UnresolvedRegion]
+
+    @property
+    def is_complete(self) -> bool:
+        return not self.unresolved_regions
 
 
 def create_1d_affine_cell(
@@ -239,22 +269,24 @@ def _validate_network_weights(
     return validated_weights, lam, input_dimension
 
 
-def _has_full_dimensional_interior(
+def classify_full_dimensional_interior(
     A: np.ndarray,
     b: np.ndarray,
     *,
     dimension: int,
     tolerance: float = 1e-9,
-) -> bool:
-    """Return whether ``A @ x <= b`` has nonempty full-dimensional interior.
+) -> FeasibilityStatus:
+    """Classify whether ``A @ x <= b`` has full-dimensional interior.
 
     The auxiliary variable ``margin`` maximizes the normalized distance from
     every nonconstant boundary:
 
         A_i @ x + ||A_i|| margin <= b_i.
 
-    A positive optimum means that a point satisfies all nonconstant
-    inequalities strictly.
+    A clearly positive optimum proves feasibility.  A successful optimum at
+    or below ``tolerance`` is deliberately ``UNKNOWN``: it may represent a
+    lower-dimensional set or a thin full-dimensional region.  Only an explicit
+    HiGHS infeasibility result is classified as ``INFEASIBLE``.
     """
 
     A = np.asarray(A, dtype=float).reshape((-1, dimension))
@@ -264,21 +296,32 @@ def _has_full_dimensional_interior(
         raise ValueError("A and b contain different numbers of constraints")
 
     if A.shape[0] == 0:
-        return True
+        return FeasibilityStatus.FEASIBLE
 
     row_norms = np.linalg.norm(A, axis=1)
-    constant_rows = row_norms <= tolerance
+    # A very small nonzero normal can still describe a genuine halfspace far
+    # from the origin.  Treat only mathematically zero rows as constants.
+    constant_rows = row_norms == 0.0
 
     # A zero-normal constraint is either always true (0 <= b) or impossible.
-    if np.any(b[constant_rows] < -tolerance):
-        return False
+    if np.any(b[constant_rows] < 0.0):
+        return FeasibilityStatus.INFEASIBLE
 
     A = A[~constant_rows]
     b = b[~constant_rows]
     row_norms = row_norms[~constant_rows]
 
     if A.shape[0] == 0:
-        return True
+        return FeasibilityStatus.FEASIBLE
+
+    # Normalize every genuine halfspace before calling HiGHS.  Otherwise its
+    # own coefficient tolerances can turn a small nonzero normal into a zero
+    # row and incorrectly report a feasible far-away halfspace as infeasible.
+    A = A / row_norms[:, None]
+    b = b / row_norms
+    if not np.all(np.isfinite(A)) or not np.all(np.isfinite(b)):
+        return FeasibilityStatus.UNKNOWN
+    row_norms = np.ones_like(row_norms)
 
     # Variables are [x_1, ..., x_n, margin].
     augmented_A = np.column_stack((A, row_norms))
@@ -298,7 +341,31 @@ def _has_full_dimensional_interior(
         method="highs",
     )
 
-    return bool(result.success and result.x is not None and result.x[-1] > tolerance)
+    if result.status == 2:
+        return FeasibilityStatus.INFEASIBLE
+    if not result.success or result.x is None:
+        return FeasibilityStatus.UNKNOWN
+    return (
+        FeasibilityStatus.FEASIBLE
+        if result.x[-1] > tolerance
+        else FeasibilityStatus.UNKNOWN
+    )
+
+
+def _has_full_dimensional_interior(
+    A: np.ndarray,
+    b: np.ndarray,
+    *,
+    dimension: int,
+    tolerance: float = 1e-9,
+) -> bool:
+    """Compatibility predicate; ambiguous regions are not reported feasible."""
+    return (
+        classify_full_dimensional_interior(
+            A, b, dimension=dimension, tolerance=tolerance
+        )
+        is FeasibilityStatus.FEASIBLE
+    )
 
 
 def _append_constraints(
@@ -330,7 +397,8 @@ def _split_region_at_relu_layer(
     bias: np.ndarray,
     *,
     input_dimension: int,
-) -> list[_AffineRegion]:
+    stage: str,
+) -> tuple[list[_AffineRegion], list[UnresolvedRegion]]:
     """Split one affine region according to one ReLU layer."""
 
     preactivation_matrix = W @ region.affine_matrix
@@ -338,6 +406,7 @@ def _split_region_at_relu_layer(
 
     number_of_units = W.shape[0]
     child_regions: list[_AffineRegion] = []
+    unresolved_regions: list[UnresolvedRegion] = []
 
     for activation_pattern in product((False, True), repeat=number_of_units):
         additional_A: list[np.ndarray] = []
@@ -364,11 +433,15 @@ def _split_region_at_relu_layer(
             dimension=input_dimension,
         )
 
-        if not _has_full_dimensional_interior(
+        status = classify_full_dimensional_interior(
             A,
             b,
             dimension=input_dimension,
-        ):
+        )
+        if status is FeasibilityStatus.INFEASIBLE:
+            continue
+        if status is FeasibilityStatus.UNKNOWN:
+            unresolved_regions.append(UnresolvedRegion(A, b, stage))
             continue
 
         diagonal = np.diag(np.asarray(activation_pattern, dtype=float))
@@ -382,16 +455,16 @@ def _split_region_at_relu_layer(
             )
         )
 
-    return child_regions
+    return child_regions, unresolved_regions
 
 
-def discover_cells_from_network_weights(
+def discover_cells_result_from_network_weights(
     relu_network_weights: list[tuple[np.ndarray, np.ndarray]],
     lam: np.ndarray,
     c: float,
     piecewise_quadratic_activation: PiecewiseQuadratic1D | None = None,
-) -> list[Cell]:
-    """Discover full-dimensional quadratic cells of a ReLU network.
+) -> CellDiscoveryResult:
+    """Conservatively discover full-dimensional cells of a ReLU network.
 
     The last tuple in ``relu_network_weights`` is treated as an affine output
     layer. ReLU is applied after every preceding layer.
@@ -426,20 +499,22 @@ def discover_cells_from_network_weights(
             b=np.empty((0,)),
         )
     ]
+    unresolved_regions: list[UnresolvedRegion] = []
 
     # Every layer except the final layer is followed by ReLU.
-    for W, bias in weights[:-1]:
+    for layer_index, (W, bias) in enumerate(weights[:-1]):
         next_regions: list[_AffineRegion] = []
 
         for region in regions:
-            next_regions.extend(
-                _split_region_at_relu_layer(
-                    region,
-                    W,
-                    bias,
-                    input_dimension=input_dimension,
-                )
+            children, unresolved = _split_region_at_relu_layer(
+                region,
+                W,
+                bias,
+                input_dimension=input_dimension,
+                stage=f"relu_layer_{layer_index}",
             )
+            next_regions.extend(children)
+            unresolved_regions.extend(unresolved)
 
         regions = next_regions
 
@@ -483,11 +558,17 @@ def discover_cells_from_network_weights(
                 dimension=input_dimension,
             )
 
-            if not _has_full_dimensional_interior(
+            status = classify_full_dimensional_interior(
                 A,
                 b,
                 dimension=input_dimension,
-            ):
+            )
+            if status is FeasibilityStatus.INFEASIBLE:
+                continue
+            if status is FeasibilityStatus.UNKNOWN:
+                unresolved_regions.append(
+                    UnresolvedRegion(A, b, "piecewise_quadratic_output")
+                )
                 continue
 
             Q = np.zeros((input_dimension, input_dimension))
@@ -534,7 +615,22 @@ def discover_cells_from_network_weights(
                 )
             )
 
-    return cells
+    return CellDiscoveryResult(cells, unresolved_regions)
+
+
+def discover_cells_from_network_weights(
+    relu_network_weights: list[tuple[np.ndarray, np.ndarray]],
+    lam: np.ndarray,
+    c: float,
+    piecewise_quadratic_activation: PiecewiseQuadratic1D | None = None,
+) -> list[Cell]:
+    """Compatibility wrapper returning only conclusively discovered cells."""
+    return discover_cells_result_from_network_weights(
+        relu_network_weights,
+        lam,
+        c,
+        piecewise_quadratic_activation,
+    ).cells
 
 
 def discover_cells_from_certificate(
@@ -550,6 +646,23 @@ def discover_cells_from_certificate(
     if not weights or weights[-1][0].shape[0] != 1:
         raise ValueError("piecewise-quadratic certificate must have scalar output")
     return discover_cells_from_network_weights(
+        weights,
+        lam=np.ones(1),
+        c=0.0,
+        piecewise_quadratic_activation=(
+            certificate.get_last_layer_piecewise_quadratic_activation()
+        ),
+    )
+
+
+def discover_cells_result_from_certificate(
+    certificate: PiecewiseQuadraticCertificate,
+) -> CellDiscoveryResult:
+    """Return cells and unresolved candidates for a scalar certificate."""
+    weights = certificate.get_relu_network_weights()
+    if not weights or weights[-1][0].shape[0] != 1:
+        raise ValueError("piecewise-quadratic certificate must have scalar output")
+    return discover_cells_result_from_network_weights(
         weights,
         lam=np.ones(1),
         c=0.0,
