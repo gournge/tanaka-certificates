@@ -60,6 +60,7 @@ from tanaka_certificates.verifier.base import Verifier, VerificationResult
 
 
 class IssueKind(str, Enum):
+    NONNEGATIVITY = "nonnegativity"
     INITIAL = "initial_value"
     UNSAFE = "unsafe_value"
     DOMAIN_BOUNDARY = "domain_boundary"
@@ -81,7 +82,11 @@ class VerificationIssue:
     def margin(self) -> float:
         return (
             self.bound - self.value
-            if self.kind in (IssueKind.UNSAFE, IssueKind.DOMAIN_BOUNDARY)
+            if self.kind in (
+                IssueKind.NONNEGATIVITY,
+                IssueKind.UNSAFE,
+                IssueKind.DOMAIN_BOUNDARY,
+            )
             else self.value - self.bound
         )
 
@@ -115,6 +120,9 @@ class VerifierPiecewiseQuadratic(Verifier):
         self.issues = []
         self._unresolved = False
         problem = self.reach_avoid_problem
+        self._check_region(
+            problem.domain, IssueKind.NONNEGATIVITY, 0.0, maximum=False
+        )
         self._check_region(
             problem.initial, IssueKind.INITIAL, problem.alpha, maximum=True
         )

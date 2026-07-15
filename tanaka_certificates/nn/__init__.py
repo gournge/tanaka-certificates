@@ -7,6 +7,26 @@ from torch import nn
 import numpy as np
 
 from tanaka_certificates.certificate import Certificate
+from tanaka_certificates.nn.local_time_architectures import (
+    DeepReLUICNN,
+    LocalTimeByConstructionCertificate,
+    MaxAffineConvex,
+    ResidualDeepICNNCertificate,
+    ResidualMaxAffineCertificate,
+    SmoothHingePWQ,
+    UnconstrainedPWQCertificate,
+)
+
+__all__ = [
+    "DeepReLUICNN",
+    "LocalTimeByConstructionCertificate",
+    "MaxAffineConvex",
+    "ResidualDeepICNNCertificate",
+    "ResidualMaxAffineCertificate",
+    "SmoothHingePWQ",
+    "UnconstrainedPWQCertificate",
+    "create_1d_certificate_given_cells",
+]
 
 if TYPE_CHECKING:
     from tanaka_certificates.cell_discovery import Cell

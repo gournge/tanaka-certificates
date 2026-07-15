@@ -7,6 +7,7 @@ from .verifier_qwl import (
     VerifierPiecewiseQuadratic,
 )
 from .verifier_qwl_numerical import VerifierPiecewiseQuadraticNumerical
+from .verifier_qwl_construction import VerifierLocalTimeByConstruction
 
 __all__ = [
     "VerificationResult",
@@ -16,5 +17,6 @@ __all__ = [
     "IssueKind",
     "VerificationIssue",
     "VerifierPiecewiseQuadraticNumerical",
+    "VerifierLocalTimeByConstruction",
     "QuadraticForm",
 ]

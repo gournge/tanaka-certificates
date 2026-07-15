@@ -2,7 +2,7 @@
 
 \usepackage[margin=1.8cm]{geometry}
 \usepackage{xcolor}
-\usepackage{amsmath,amssymb}
+\usepackage{amsmath,amssymb,amsthm}
 \usepackage{tcolorbox}
 \usepackage{enumitem}
 \usepackage{graphicx}
@@ -18,6 +18,13 @@
 \renewcommand{\figureautorefname}{Figure}
 \renewcommand{\tableautorefname}{Table}
 \renewcommand{\equationautorefname}{Equation}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
 
 \setlist[enumerate]{
   leftmargin=3.5em,
@@ -95,5 +102,6 @@
 \input{sections/03-concrete-1d-examples}
 \input{sections/04-piecewise-quadratic-cert-1d}
 \input{sections/05-piecewise-quadratic-multidim}
+\input{sections/06-local-time-condition-by-construction}
 
 \end{document}
