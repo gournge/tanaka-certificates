@@ -159,6 +159,46 @@ def _assemble_lp_constraints(
     return np.vstack(matrices), bounds
 
 
+def _assemble_alpha_optimization_constraints(
+    *,
+    domain_basis,
+    initial_basis,
+    unsafe_basis,
+    boundary_basis,
+    generator_basis,
+    teacher_basis,
+    teacher_values,
+    generator_bound,
+    alpha_limit=None,
+):
+    """Assemble the lexicographic LP over ``[coefficients, alpha, error]``."""
+    zero2 = lambda rows: np.zeros((len(rows), 2))
+    matrices = [
+        np.column_stack((-domain_basis, zero2(domain_basis))),
+        np.column_stack((initial_basis, -np.ones(len(initial_basis)), np.zeros(len(initial_basis)))),
+        np.column_stack((-unsafe_basis, zero2(unsafe_basis))),
+        np.column_stack((-boundary_basis, zero2(boundary_basis))),
+        np.column_stack((generator_basis, zero2(generator_basis))),
+        np.column_stack((teacher_basis, np.zeros(len(teacher_basis)), -np.ones(len(teacher_basis)))),
+        np.column_stack((-teacher_basis, np.zeros(len(teacher_basis)), -np.ones(len(teacher_basis)))),
+    ]
+    bounds = [
+        np.full(len(domain_basis), -0.03),
+        np.zeros(len(initial_basis)),
+        np.full(len(unsafe_basis), -2.03),
+        np.full(len(boundary_basis), -2.03),
+        np.full(len(generator_basis), generator_bound),
+        teacher_values,
+        -teacher_values,
+    ]
+    if alpha_limit is not None:
+        row = np.zeros((1, domain_basis.shape[1] + 2))
+        row[0, -2] = 1.0
+        matrices.append(row)
+        bounds.append(np.asarray([alpha_limit]))
+    return np.vstack(matrices), np.concatenate(bounds)
+
+
 def _require_success(result):
     """Convert every unsuccessful SciPy LP termination into a useful error."""
     if not result.success:
@@ -173,6 +213,11 @@ def train_fixed_pwq_lp(
     alpha=1.97,
     seed=2040,
     output: str | Path | None = None,
+    epsilon: float = 0.1,
+    teacher_epsilon: float = 0.5,
+    teacher_offset: float = 0.3,
+    optimize_alpha: bool = False,
+    alpha_slack: float = 0.01,
 ):
     """Fit fixed PWQ features to a Poisson teacher under certificate constraints.
 
@@ -180,7 +225,11 @@ def train_fixed_pwq_lp(
     polynomial and squared-hinge coefficients are the solution of a linear
     program, while its convex-kink branch is disabled identically.
     """
-    sde, problem = make_enlarged_target_ou_problem(alpha=alpha)
+    if epsilon < 0.0 or teacher_epsilon < 0.0 or teacher_offset < 0.0:
+        raise ValueError("epsilon and teacher parameters must be nonnegative")
+    if optimize_alpha and alpha_slack <= 0.0:
+        raise ValueError("alpha_slack must be positive when optimizing alpha")
+    sde, problem = make_enlarged_target_ou_problem(alpha=alpha, epsilon=epsilon)
     model, ridge_weights, ridge_biases = _initialize_fixed_features(
         smooth_width, seed, problem.beta
     )
@@ -271,9 +320,9 @@ def train_fixed_pwq_lp(
     cell_generator_basis = np.vstack(cell_generator_basis)
 
     tx, ty, teacher_grid = solve_ou_dirichlet_problem(
-        sde, problem, 120, generator_value=-0.5
+        sde, problem, 120, generator_value=-teacher_epsilon
     )
-    teacher_grid += 0.3
+    teacher_grid += teacher_offset
     teacher_points = _rectangle(problem.domain.lower, problem.domain.upper, 41)
     teacher_values = RegularGridInterpolator((ty, tx), teacher_grid)(
         np.column_stack((teacher_points[:, 1], teacher_points[:, 0]))
@@ -293,29 +342,83 @@ def train_fixed_pwq_lp(
     for refinement_iterations in range(1, 11):
         _, generator_basis = _basis(generator_points, ridge_weights, ridge_biases)
         generator_basis = np.vstack((generator_basis, cell_generator_basis))
-        matrix, bounds = _assemble_lp_constraints(
-            domain_basis=domain_basis,
-            initial_basis=initial_basis,
-            unsafe_basis=unsafe_basis,
-            boundary_basis=boundary_basis,
-            generator_basis=generator_basis,
-            teacher_basis=teacher_basis,
-            teacher_values=teacher_values,
-            alpha=alpha,
-        )
-        solve_started = perf_counter()
-        result = linprog(
-            np.concatenate((np.zeros(variable_count), [1.0])),
-            A_ub=matrix, b_ub=bounds,
-            bounds=[(-200.0, 200.0)] * variable_count + [(0.0, None)],
-            method="highs",
-        )
-        solve_seconds += perf_counter() - solve_started
-        _require_success(result)
-        coefficients = result.x[:-1]
+        if optimize_alpha:
+            matrix, bounds = _assemble_alpha_optimization_constraints(
+                domain_basis=domain_basis,
+                initial_basis=initial_basis,
+                unsafe_basis=unsafe_basis,
+                boundary_basis=boundary_basis,
+                generator_basis=generator_basis,
+                teacher_basis=teacher_basis,
+                teacher_values=teacher_values,
+                generator_bound=-(epsilon + 0.02),
+            )
+            variable_bounds = (
+                [(-200.0, 200.0)] * variable_count
+                + [(0.0, problem.beta), (0.0, None)]
+            )
+            alpha_objective = np.zeros(variable_count + 2)
+            alpha_objective[-2] = 1.0
+            solve_started = perf_counter()
+            alpha_result = linprog(
+                alpha_objective,
+                A_ub=matrix,
+                b_ub=bounds,
+                bounds=variable_bounds,
+                method="highs",
+            )
+            solve_seconds += perf_counter() - solve_started
+            _require_success(alpha_result)
+            optimized_alpha = float(alpha_result.x[-2])
+            matrix, bounds = _assemble_alpha_optimization_constraints(
+                domain_basis=domain_basis,
+                initial_basis=initial_basis,
+                unsafe_basis=unsafe_basis,
+                boundary_basis=boundary_basis,
+                generator_basis=generator_basis,
+                teacher_basis=teacher_basis,
+                teacher_values=teacher_values,
+                generator_bound=-(epsilon + 0.02),
+                alpha_limit=optimized_alpha + alpha_slack,
+            )
+            teacher_objective = np.zeros(variable_count + 2)
+            teacher_objective[-1] = 1.0
+            solve_started = perf_counter()
+            result = linprog(
+                teacher_objective,
+                A_ub=matrix,
+                b_ub=bounds,
+                bounds=variable_bounds,
+                method="highs",
+            )
+            solve_seconds += perf_counter() - solve_started
+            _require_success(result)
+            coefficients = result.x[:variable_count]
+        else:
+            matrix, bounds = _assemble_lp_constraints(
+                domain_basis=domain_basis,
+                initial_basis=initial_basis,
+                unsafe_basis=unsafe_basis,
+                boundary_basis=boundary_basis,
+                generator_basis=generator_basis,
+                teacher_basis=teacher_basis,
+                teacher_values=teacher_values,
+                alpha=alpha,
+            )
+            solve_started = perf_counter()
+            result = linprog(
+                np.concatenate((np.zeros(variable_count), [1.0])),
+                A_ub=matrix, b_ub=bounds,
+                bounds=[(-200.0, 200.0)] * variable_count + [(0.0, None)],
+                method="highs",
+            )
+            solve_seconds += perf_counter() - solve_started
+            _require_success(result)
+            coefficients = result.x[:-1]
         _, audit_generator_basis = _basis(audit, ridge_weights, ridge_biases)
         audit_generator = audit_generator_basis @ coefficients
-        violations = np.flatnonzero(audit_generator > -0.115)
+        audit_threshold = -(epsilon + 0.015) if optimize_alpha else -0.115
+        violations = np.flatnonzero(audit_generator > audit_threshold)
         if not len(violations):
             break
         worst = violations[
@@ -335,6 +438,33 @@ def train_fixed_pwq_lp(
         solve_seconds=solve_seconds,
     )
     model.lp_statistics = asdict(statistics)
+    model.optimized_alpha = (
+        optimized_alpha + alpha_slack if optimize_alpha else alpha
+    )
     if output is not None:
         torch.save(model.state_dict(), Path(output))
     return model, result.fun
+
+
+def train_optimized_alpha_fixed_pwq_lp(
+    *,
+    epsilon: float = 0.1,
+    smooth_width: int = 48,
+    teacher_offset: float = 0.03,
+    alpha_slack: float = 0.01,
+    seed: int = 2040,
+    output: str | Path | None = None,
+):
+    """Minimize alpha first, then teacher error at the near-optimal alpha."""
+    model, teacher_error = train_fixed_pwq_lp(
+        smooth_width=smooth_width,
+        alpha=1.99,
+        seed=seed,
+        output=output,
+        epsilon=epsilon,
+        teacher_epsilon=epsilon,
+        teacher_offset=teacher_offset,
+        optimize_alpha=True,
+        alpha_slack=alpha_slack,
+    )
+    return model, model.optimized_alpha, teacher_error

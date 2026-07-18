@@ -168,9 +168,15 @@ def make_ou_problem(
 
 def make_enlarged_target_ou_problem(
     alpha: float = 0.5,
+    epsilon: float = 0.1,
 ) -> tuple[IsotropicOrnsteinUhlenbeck, ReachAvoidProblem]:
     """Return the OU problem with the enlarged target used for LP training."""
-    return _make_ou_problem(alpha, target_lower=(-0.5, -0.5), target_upper=(0.5, 0.5))
+    return _make_ou_problem(
+        alpha,
+        target_lower=(-0.5, -0.5),
+        target_upper=(0.5, 0.5),
+        epsilon=epsilon,
+    )
 
 
 def _make_ou_problem(
@@ -178,6 +184,7 @@ def _make_ou_problem(
     *,
     target_lower: tuple[float, float],
     target_upper: tuple[float, float],
+    epsilon: float = 0.1,
 ) -> tuple[IsotropicOrnsteinUhlenbeck, ReachAvoidProblem]:
     sde = IsotropicOrnsteinUhlenbeck(2, volatility=0.5)
     problem = ReachAvoidProblem(
@@ -189,7 +196,7 @@ def _make_ou_problem(
         target=create_hyperrectangle(target_lower, target_upper),
         alpha=alpha,
         beta=2.0,
-        epsilon=0.1,
+        epsilon=epsilon,
     )
     return sde, problem
 

@@ -7,6 +7,7 @@ import torch
 
 from tanaka_certificates.nn.train_certificate import _values_and_generator
 from tanaka_certificates.nn.train_fixed_pwq_lp import (
+    _assemble_alpha_optimization_constraints,
     _assemble_lp_constraints,
     _basis,
     _initialize_fixed_features,
@@ -14,6 +15,7 @@ from tanaka_certificates.nn.train_fixed_pwq_lp import (
     _require_success,
     format_lp_statistics,
     train_fixed_pwq_lp,
+    train_optimized_alpha_fixed_pwq_lp,
 )
 from tanaka_certificates.problems import make_enlarged_target_ou_problem
 from tanaka_certificates.verifier import VerifierLocalTimeByConstruction
@@ -110,6 +112,37 @@ def test_constraint_assembly_has_the_intended_signs_and_bounds():
     np.testing.assert_allclose(bounds, [-0.03, 1.18, -2.03, -2.03, -0.12, 0.7, -0.7])
 
 
+def test_alpha_optimization_assembly_uses_lexicographic_variables():
+    matrix, bounds = _assemble_alpha_optimization_constraints(
+        domain_basis=np.array([[1.0]]),
+        initial_basis=np.array([[2.0]]),
+        unsafe_basis=np.array([[3.0]]),
+        boundary_basis=np.array([[4.0]]),
+        generator_basis=np.array([[5.0]]),
+        teacher_basis=np.array([[6.0]]),
+        teacher_values=np.array([0.7]),
+        generator_bound=-0.12,
+        alpha_limit=1.19,
+    )
+
+    np.testing.assert_array_equal(
+        matrix,
+        [
+            [-1.0, 0.0, 0.0],
+            [2.0, -1.0, 0.0],
+            [-3.0, 0.0, 0.0],
+            [-4.0, 0.0, 0.0],
+            [5.0, 0.0, 0.0],
+            [6.0, 0.0, -1.0],
+            [-6.0, 0.0, -1.0],
+            [0.0, 1.0, 0.0],
+        ],
+    )
+    np.testing.assert_allclose(
+        bounds, [-0.03, 0.0, -2.03, -2.03, -0.12, 0.7, -0.7, 1.19]
+    )
+
+
 def test_successful_solver_result_is_accepted():
     result = linprog([1.0], bounds=[(0.0, None)], method="highs")
 
@@ -187,4 +220,22 @@ def test_production_lp_serializes_and_formally_verifies(tmp_path):
     assert model.lp_statistics["solver_status"] == 0
     assert model.lp_statistics["solver_iterations"] > 0
     assert model.lp_statistics["solve_seconds"] > 0.0
+    assert VerifierLocalTimeByConstruction(sde, problem, model).verify().value == "verified"
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(
+    os.environ.get("TANAKA_RUN_SLOW_TESTS") != "1",
+    reason="set TANAKA_RUN_SLOW_TESTS=1 to run the production LP",
+)
+def test_optimized_strict_drift_alpha_improves_and_verifies(tmp_path):
+    model, alpha, error = train_optimized_alpha_fixed_pwq_lp(
+        epsilon=0.1,
+        alpha_slack=0.02,
+        output=tmp_path / "optimized_certificate.pt",
+    )
+    sde, problem = make_enlarged_target_ou_problem(alpha=alpha, epsilon=0.1)
+
+    assert alpha < 1.97
+    assert np.isfinite(error)
     assert VerifierLocalTimeByConstruction(sde, problem, model).verify().value == "verified"

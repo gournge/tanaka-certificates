@@ -18,3 +18,9 @@ def test_enlarged_target_ou_problem_is_explicit():
 
     np.testing.assert_array_equal(problem.target.lower, [-0.5, -0.5])
     np.testing.assert_array_equal(problem.target.upper, [0.5, 0.5])
+
+
+def test_enlarged_target_problem_accepts_frontier_epsilon():
+    _, problem = make_enlarged_target_ou_problem(epsilon=0.025)
+
+    assert problem.epsilon == 0.025
