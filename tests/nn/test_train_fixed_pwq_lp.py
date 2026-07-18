@@ -22,7 +22,7 @@ from tanaka_certificates.verifier import VerifierLocalTimeByConstruction
 
 
 def _model_and_coefficients():
-    model, weights, biases = _initialize_fixed_features(2, seed=17, beta=2.0)
+    model, weights, biases, _, _ = _initialize_fixed_features(2, seed=17, beta=2.0)
     weights = np.array([[1.0, -0.5], [-0.25, 0.75]])
     biases = np.array([-0.25, 0.1])
     coefficients = np.array([0.2, -0.3, 0.4, 0.5, -0.2, 0.1, 0.7, -0.6])
@@ -63,8 +63,8 @@ def test_basis_generator_equals_autograd_on_both_ridge_branches():
 
 
 def test_fixed_feature_initialization_is_deterministic_for_a_seed():
-    left, left_weights, left_biases = _initialize_fixed_features(6, 123, 2.0)
-    right, right_weights, right_biases = _initialize_fixed_features(6, 123, 2.0)
+    left, left_weights, left_biases, _, _ = _initialize_fixed_features(6, 123, 2.0)
+    right, right_weights, right_biases, _, _ = _initialize_fixed_features(6, 123, 2.0)
 
     np.testing.assert_array_equal(left_weights, right_weights)
     np.testing.assert_array_equal(left_biases, right_biases)
@@ -73,7 +73,7 @@ def test_fixed_feature_initialization_is_deterministic_for_a_seed():
 
 
 def test_disabled_convex_kink_branch_is_identically_zero():
-    model, _, _ = _initialize_fixed_features(4, 5, 2.0)
+    model, _, _, _, _ = _initialize_fixed_features(4, 5, 2.0)
     points = torch.tensor(
         [[-100.0, 100.0], [0.0, 0.0], [100.0, -100.0]],
         dtype=next(model.parameters()).dtype,
@@ -83,6 +83,43 @@ def test_disabled_convex_kink_branch_is_identically_zero():
         kink = model.convex_kink(points)
 
     torch.testing.assert_close(kink, torch.zeros_like(kink), rtol=0.0, atol=0.0)
+
+
+def test_fixed_convex_feature_values_and_generator_match_model():
+    model, weights, biases, convex_weights, convex_biases = (
+        _initialize_fixed_features(2, seed=17, beta=2.0, convex_width=2)
+    )
+    coefficients = np.array(
+        [0.2, -0.3, 0.4, 0.5, -0.2, 0.1, 0.7, -0.6, 0.25, 0.8]
+    )
+    _load_coefficients(
+        model, coefficients, weights, biases, convex_weights, convex_biases
+    )
+    points = np.array([[-0.4, 0.7], [0.25, 0.0], [0.8, -0.2]])
+
+    values, generator = _basis(
+        points,
+        weights,
+        biases,
+        convex_weights=convex_weights,
+        convex_biases=convex_biases,
+    )
+    dtype = next(model.parameters()).dtype
+    with torch.no_grad():
+        actual = model(torch.as_tensor(points, dtype=dtype)).squeeze(-1).numpy()
+    _, actual_generator = _values_and_generator(
+        model,
+        make_enlarged_target_ou_problem()[0],
+        torch.as_tensor(points, dtype=dtype).requires_grad_(True),
+    )
+
+    np.testing.assert_allclose(values @ coefficients, actual, rtol=1e-5, atol=1e-6)
+    np.testing.assert_allclose(
+        generator @ coefficients,
+        actual_generator.detach().numpy(),
+        rtol=1e-5,
+        atol=1e-6,
+    )
 
 
 def test_constraint_assembly_has_the_intended_signs_and_bounds():
@@ -173,7 +210,7 @@ def test_coefficients_survive_state_dict_round_trip(tmp_path):
     model, _, _, _ = _model_and_coefficients()
     path = tmp_path / "fixed_pwq.pt"
     torch.save(model.state_dict(), path)
-    reloaded, _, _ = _initialize_fixed_features(2, seed=999, beta=2.0)
+    reloaded, _, _, _, _ = _initialize_fixed_features(2, seed=999, beta=2.0)
     reloaded.load_state_dict(torch.load(path, weights_only=True))
     points = torch.tensor(
         [[-0.3, 0.2], [0.6, -0.9], [1.0, 0.4]],

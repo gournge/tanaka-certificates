@@ -45,7 +45,15 @@ def _rectangle(lower, upper, resolution):
     return np.column_stack((xx.ravel(), yy.ravel()))
 
 
-def _basis(points, weights, biases, active_mask=None):
+def _basis(
+    points,
+    weights,
+    biases,
+    active_mask=None,
+    convex_weights=None,
+    convex_biases=None,
+    convex_active_mask=None,
+):
     x, y = points.T
     preactivation = points @ weights.T + biases
     if active_mask is None:
@@ -55,33 +63,59 @@ def _basis(points, weights, biases, active_mask=None):
             np.asarray(active_mask, dtype=bool), preactivation.shape
         )
     active = np.where(indicator, preactivation, 0.0)
-    values = 2.0 * np.column_stack(
-        (
-            np.ones(len(points)), x, y, 0.5 * x**2, x * y, 0.5 * y**2,
-            0.5 * active**2,
-        )
-    )
-    generator = 2.0 * np.column_stack(
-        (
-            np.zeros(len(points)), -x, -y, -x**2 + 0.125,
-            -2.0 * x * y, -y**2 + 0.125,
+    columns = [
+        np.ones(len(points)), x, y, 0.5 * x**2, x * y, 0.5 * y**2,
+        *[0.5 * active[:, index] ** 2 for index in range(active.shape[1])],
+    ]
+    generator_columns = [
+        np.zeros(len(points)), -x, -y, -x**2 + 0.125,
+        -2.0 * x * y, -y**2 + 0.125,
+        *[
             (
-                -active * (points @ weights.T)
-                + 0.125 * np.sum(weights**2, axis=1)
-            ) * indicator,
+                -active[:, index] * (points @ weights[index])
+                + 0.125 * np.sum(weights[index] ** 2)
+            ) * indicator[:, index]
+            for index in range(active.shape[1])
+        ],
+    ]
+    if convex_weights is not None or convex_biases is not None:
+        if convex_weights is None or convex_biases is None:
+            raise ValueError("convex weights and biases must be supplied together")
+        convex_weights = np.asarray(convex_weights)
+        convex_preactivation = (
+            points @ convex_weights.T + np.asarray(convex_biases)
         )
-    )
+        if convex_active_mask is None:
+            convex_indicator = convex_preactivation > 0.0
+        else:
+            convex_indicator = np.broadcast_to(
+                np.asarray(convex_active_mask, dtype=bool),
+                convex_preactivation.shape,
+            )
+        convex_active = np.where(convex_indicator, convex_preactivation, 0.0)
+        # V = S-C.  The affine facets have zero diffusion curvature inside a
+        # cell, but under b(x)=-x their drift contribution is gamma * a^T x.
+        # Their singular contribution has the required nonpositive sign.
+        columns.extend(-convex_active[:, index] for index in range(convex_active.shape[1]))
+        generator_columns.extend(
+            (points @ convex_weights[index]) * convex_indicator[:, index]
+            for index in range(convex_active.shape[1])
+        )
+    values = 2.0 * np.column_stack(columns)
+    generator = 2.0 * np.column_stack(generator_columns)
     return values, generator
 
 
-def _initialize_fixed_features(smooth_width, seed, beta):
-    """Create deterministic, general-position features and disable the C branch."""
+def _initialize_fixed_features(smooth_width, seed, beta, convex_width=0):
+    """Create deterministic, general-position features for fixed ``S-C``."""
+    if convex_width < 0:
+        raise ValueError("convex_width must be nonnegative")
     torch.manual_seed(seed)
     _, problem = make_enlarged_target_ou_problem()
     model = ResidualDeepICNNCertificate(
         2,
         smooth_width=smooth_width,
-        icnn_width=1,
+        icnn_width=max(1, convex_width),
         icnn_layers=1,
         output_scale=beta,
     )
@@ -91,21 +125,44 @@ def _initialize_fixed_features(smooth_width, seed, beta):
     rng = np.random.default_rng(seed)
     ridge_weights += rng.normal(0.0, 2e-4, ridge_weights.shape)
     ridge_biases += rng.normal(0.0, 2e-4, ridge_biases.shape)
+    convex_weights = convex_biases = None
+    if convex_width:
+        angles = np.linspace(0.0, np.pi, convex_width, endpoint=False)
+        convex_weights = 0.5 * np.column_stack((np.cos(angles), np.sin(angles)))
+        convex_biases = np.linspace(-0.55, 0.55, convex_width)
+        convex_weights += rng.normal(0.0, 2e-4, convex_weights.shape)
+        convex_biases += rng.normal(0.0, 2e-4, convex_biases.shape)
     with torch.no_grad():
         model.smooth.hinge.weight.copy_(torch.as_tensor(ridge_weights))
         model.smooth.hinge.bias.copy_(torch.as_tensor(ridge_biases))
-        model.convex_kink.input_layers[0].weight.zero_()
-        model.convex_kink.input_layers[0].bias.fill_(-1.0)
+        if convex_width:
+            model.convex_kink.input_layers[0].weight.copy_(
+                torch.as_tensor(convex_weights)
+            )
+            model.convex_kink.input_layers[0].bias.copy_(
+                torch.as_tensor(convex_biases)
+            )
+        else:
+            model.convex_kink.input_layers[0].weight.zero_()
+            model.convex_kink.input_layers[0].bias.fill_(-1.0)
         model.convex_kink.raw_output_weights.fill_(-30.0)
         model.convex_kink.output_input.weight.zero_()
         model.convex_kink.output_input.bias.zero_()
-    return model, ridge_weights, ridge_biases
+    return model, ridge_weights, ridge_biases, convex_weights, convex_biases
 
 
-def _load_coefficients(model, coefficients, ridge_weights, ridge_biases):
+def _load_coefficients(
+    model,
+    coefficients,
+    ridge_weights,
+    ridge_biases,
+    convex_weights=None,
+    convex_biases=None,
+):
     """Load an LP coefficient vector into the corresponding PyTorch model."""
     coefficients = np.asarray(coefficients)
-    expected = 6 + model.smooth.width
+    convex_width = 0 if convex_weights is None else len(convex_weights)
+    expected = 6 + model.smooth.width + convex_width
     if coefficients.shape != (expected,):
         raise ValueError(f"expected {expected} coefficients, got {coefficients.shape}")
     with torch.no_grad():
@@ -121,7 +178,24 @@ def _load_coefficients(model, coefficients, ridge_weights, ridge_biases):
         )
         model.smooth.hinge.weight.copy_(torch.as_tensor(ridge_weights))
         model.smooth.hinge.bias.copy_(torch.as_tensor(ridge_biases))
-        model.smooth.hinge_coefficients.copy_(torch.as_tensor(coefficients[6:]))
+        smooth_end = 6 + model.smooth.width
+        model.smooth.hinge_coefficients.copy_(
+            torch.as_tensor(coefficients[6:smooth_end])
+        )
+        if convex_width:
+            strengths = coefficients[smooth_end:]
+            raw_strengths = np.full_like(strengths, -30.0)
+            positive = strengths > 1e-12
+            raw_strengths[positive] = np.log(np.expm1(strengths[positive]))
+            model.convex_kink.input_layers[0].weight.copy_(
+                torch.as_tensor(convex_weights)
+            )
+            model.convex_kink.input_layers[0].bias.copy_(
+                torch.as_tensor(convex_biases)
+            )
+            model.convex_kink.raw_output_weights.copy_(
+                torch.as_tensor(raw_strengths)
+            )
 
 
 def _assemble_lp_constraints(
@@ -218,6 +292,7 @@ def train_fixed_pwq_lp(
     teacher_offset: float = 0.3,
     optimize_alpha: bool = False,
     alpha_slack: float = 0.01,
+    convex_width: int = 0,
 ):
     """Fit fixed PWQ features to a Poisson teacher under certificate constraints.
 
@@ -227,11 +302,15 @@ def train_fixed_pwq_lp(
     """
     if epsilon < 0.0 or teacher_epsilon < 0.0 or teacher_offset < 0.0:
         raise ValueError("epsilon and teacher parameters must be nonnegative")
+    if convex_width < 0:
+        raise ValueError("convex_width must be nonnegative")
     if optimize_alpha and alpha_slack <= 0.0:
         raise ValueError("alpha_slack must be positive when optimizing alpha")
     sde, problem = make_enlarged_target_ou_problem(alpha=alpha, epsilon=epsilon)
-    model, ridge_weights, ridge_biases = _initialize_fixed_features(
-        smooth_width, seed, problem.beta
+    model, ridge_weights, ridge_biases, convex_weights, convex_biases = (
+        _initialize_fixed_features(
+            smooth_width, seed, problem.beta, convex_width=convex_width
+        )
     )
     # The deterministic ridge initializer has many exactly concurrent lines.
     # Those create zero-dimensional candidate cells that a conservative cell
@@ -311,10 +390,21 @@ def train_fixed_pwq_lp(
                 continue
             centre = polygon.mean(axis=0)
             active_mask = centre @ ridge_weights.T + ridge_biases > 0.0
+            convex_active_mask = (
+                None
+                if convex_weights is None
+                else centre @ convex_weights.T + convex_biases > 0.0
+            )
             edge_midpoints = 0.5 * (polygon + np.roll(polygon, -1, axis=0))
             samples = np.vstack((polygon, edge_midpoints, centre[None, :]))
             _, rows = _basis(
-                samples, ridge_weights, ridge_biases, active_mask=active_mask
+                samples,
+                ridge_weights,
+                ridge_biases,
+                active_mask=active_mask,
+                convex_weights=convex_weights,
+                convex_biases=convex_biases,
+                convex_active_mask=convex_active_mask,
             )
             cell_generator_basis.append(rows)
     cell_generator_basis = np.vstack(cell_generator_basis)
@@ -327,11 +417,17 @@ def train_fixed_pwq_lp(
     teacher_values = RegularGridInterpolator((ty, tx), teacher_grid)(
         np.column_stack((teacher_points[:, 1], teacher_points[:, 0]))
     )
-    domain_basis, _ = _basis(domain, ridge_weights, ridge_biases)
-    initial_basis, _ = _basis(initial, ridge_weights, ridge_biases)
-    unsafe_basis, _ = _basis(unsafe, ridge_weights, ridge_biases)
-    boundary_basis, _ = _basis(boundary, ridge_weights, ridge_biases)
-    teacher_basis, _ = _basis(teacher_points, ridge_weights, ridge_biases)
+    basis_arguments = {
+        "convex_weights": convex_weights,
+        "convex_biases": convex_biases,
+    }
+    domain_basis, _ = _basis(domain, ridge_weights, ridge_biases, **basis_arguments)
+    initial_basis, _ = _basis(initial, ridge_weights, ridge_biases, **basis_arguments)
+    unsafe_basis, _ = _basis(unsafe, ridge_weights, ridge_biases, **basis_arguments)
+    boundary_basis, _ = _basis(boundary, ridge_weights, ridge_biases, **basis_arguments)
+    teacher_basis, _ = _basis(
+        teacher_points, ridge_weights, ridge_biases, **basis_arguments
+    )
     variable_count = teacher_basis.shape[1]
     audit = _rectangle(problem.domain.lower, problem.domain.upper, 401)
     audit = audit[[not problem.target.contains(point) for point in audit]]
@@ -340,7 +436,9 @@ def train_fixed_pwq_lp(
     solve_seconds = 0.0
     refinement_iterations = 0
     for refinement_iterations in range(1, 11):
-        _, generator_basis = _basis(generator_points, ridge_weights, ridge_biases)
+        _, generator_basis = _basis(
+            generator_points, ridge_weights, ridge_biases, **basis_arguments
+        )
         generator_basis = np.vstack((generator_basis, cell_generator_basis))
         if optimize_alpha:
             matrix, bounds = _assemble_alpha_optimization_constraints(
@@ -353,8 +451,13 @@ def train_fixed_pwq_lp(
                 teacher_values=teacher_values,
                 generator_bound=-(epsilon + 0.02),
             )
+            smooth_variable_count = 6 + smooth_width
+            coefficient_bounds = (
+                [(-200.0, 200.0)] * smooth_variable_count
+                + [(0.0, 200.0)] * convex_width
+            )
             variable_bounds = (
-                [(-200.0, 200.0)] * variable_count
+                coefficient_bounds
                 + [(0.0, problem.beta), (0.0, None)]
             )
             alpha_objective = np.zeros(variable_count + 2)
@@ -409,13 +512,19 @@ def train_fixed_pwq_lp(
             result = linprog(
                 np.concatenate((np.zeros(variable_count), [1.0])),
                 A_ub=matrix, b_ub=bounds,
-                bounds=[(-200.0, 200.0)] * variable_count + [(0.0, None)],
+                bounds=(
+                    [(-200.0, 200.0)] * (6 + smooth_width)
+                    + [(0.0, 200.0)] * convex_width
+                    + [(0.0, None)]
+                ),
                 method="highs",
             )
             solve_seconds += perf_counter() - solve_started
             _require_success(result)
             coefficients = result.x[:-1]
-        _, audit_generator_basis = _basis(audit, ridge_weights, ridge_biases)
+        _, audit_generator_basis = _basis(
+            audit, ridge_weights, ridge_biases, **basis_arguments
+        )
         audit_generator = audit_generator_basis @ coefficients
         audit_threshold = -(epsilon + 0.015) if optimize_alpha else -0.115
         violations = np.flatnonzero(audit_generator > audit_threshold)
@@ -426,7 +535,14 @@ def train_fixed_pwq_lp(
         ]
         generator_points = np.vstack((generator_points, audit[worst]))
 
-    _load_coefficients(model, coefficients, ridge_weights, ridge_biases)
+    _load_coefficients(
+        model,
+        coefficients,
+        ridge_weights,
+        ridge_biases,
+        convex_weights,
+        convex_biases,
+    )
     statistics = FixedPWQLPStatistics(
         seed=seed,
         smooth_width=smooth_width,
@@ -438,6 +554,10 @@ def train_fixed_pwq_lp(
         solve_seconds=solve_seconds,
     )
     model.lp_statistics = asdict(statistics)
+    model.lp_statistics["convex_width"] = convex_width
+    model.lp_statistics["active_convex_facets"] = int(
+        np.count_nonzero(coefficients[6 + smooth_width :] > 1e-8)
+    )
     model.optimized_alpha = (
         optimized_alpha + alpha_slack if optimize_alpha else alpha
     )
@@ -454,6 +574,7 @@ def train_optimized_alpha_fixed_pwq_lp(
     alpha_slack: float = 0.01,
     seed: int = 2040,
     output: str | Path | None = None,
+    convex_width: int = 0,
 ):
     """Minimize alpha first, then teacher error at the near-optimal alpha."""
     model, teacher_error = train_fixed_pwq_lp(
@@ -466,5 +587,6 @@ def train_optimized_alpha_fixed_pwq_lp(
         teacher_offset=teacher_offset,
         optimize_alpha=True,
         alpha_slack=alpha_slack,
+        convex_width=convex_width,
     )
     return model, model.optimized_alpha, teacher_error
