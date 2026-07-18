@@ -117,12 +117,14 @@ Stop on reaching $X_T$, $\partial K$, or the superlevel set $\{V\geq\beta\}$.
 \textbf{Theorem (reach--avoid guarantee).} If the stopped process
 $V(X_{t\wedge\tau})$ is a supermartingale, then
 \[
-\mathbb P\!\left(\tau_{V\geq\beta}<
-\tau_{\partial K}\wedge\tau_{X_T}\right)
+\mathbb P\!\left(
+\tau_{X_u}\wedge\tau_{\partial K}<\tau_{X_T}
+\right)
 \leq\frac{\alpha}{\beta}.
 \]
-Because $V\geq\beta$ on $X_u$, this bounds the probability of reaching the
-unsafe set before the target without first leaving the certified domain.
+Thus failure includes either reaching the unsafe set or leaving the certified
+domain before the target. Both imply reaching certificate level $\beta$ by
+the stopping time.
 }
 
 \postersection{2. It\^o--Tanaka certificates}

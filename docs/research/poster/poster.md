@@ -24,8 +24,8 @@ Denoting V(X_{t wedge \tau wedge {\delta D} wedge {V >= beta}}) = V(X_{\tau \wed
 
 > **Theorem**: 
 > If V(X_{\tau \wedge \text{stop}}) is a supermartingale, then 
-> P(\tau_{V >= beta} < \tau_{\delta D} \wedge \tau_{X_T}) <= alpha / beta
-> which means that the probability of reaching the unsafe set before reaching the target set is bounded by alpha / beta.
+> P(\tau_{X_u} \wedge \tau_{\delta D} < \tau_{X_T}) <= alpha / beta
+> which means that the probability of reaching the unsafe set or exiting the certified domain before reaching the target set is bounded by alpha / beta.
 
 ## Ito-Tanaka formula and Certificates
 

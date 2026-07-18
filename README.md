@@ -78,24 +78,22 @@ or Ubuntu, these are provided by:
 sudo apt install latexmk texlive-latex-recommended
 ```
 
-Then run the following commands from the repository root.
-
-To compile the research log:
-
-```bash
-mkdir -p docs/research/pdf
-latexmk -pdf -cd -outdir=../pdf -jobname=research-log docs/research/log/main.tex
-```
-
-To compile a weekly report:
+Compile the research log, poster, and every weekly report from the repository
+root with the shared script:
 
 ```bash
-mkdir -p docs/research/pdf/weekly-reports
-latexmk -pdf -cd -outdir=../pdf/weekly-reports docs/research/weekly-reports/2026-07-01.tex
+./scripts/compile_latex.sh
 ```
 
-These commands place rendered documents in `docs/research/pdf/`, keeping
-generated LaTeX build files out of the source directories.
+To compile only selected document groups, pass one or more of `log`, `poster`,
+or `weekly`, for example:
+
+```bash
+./scripts/compile_latex.sh log poster
+```
+
+The research log and weekly reports are written under `docs/research/pdf/`;
+the poster is written to `docs/research/poster/poster.pdf`.
 
 ## References
 

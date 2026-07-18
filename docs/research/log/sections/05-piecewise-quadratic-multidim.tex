@@ -560,6 +560,48 @@ these are the conditions implemented by the multidimensional
 piecewise-quadratic verifier.  Applying the preceding It\^o--Tanaka argument
 up to $\tau$ shows that $V(X_{t\wedge\tau})$ is a supermartingale.
 
+\subsection{Interpreting the probability bound in the OU benchmark}
+
+The failure event in this stopping convention is
+\[
+  \{\tau_{X_u}\wedge\tau_{\partial K}<\tau_{X_\tau}\},
+\]
+namely, reaching the unsafe set \emph{or leaving the certified domain} before
+reaching the target.  The boundary condition
+$V\geq\beta$ on $(X_u\cup\partial K)\setminus X_\tau$, together with
+$\sup_{X_0}V\leq\alpha$, gives the uniform bound
+\[
+  \sup_{x\in X_0}
+  \mathbb P_x\!\left(
+    \tau_{X_u}\wedge\tau_{\partial K}<\tau_{X_\tau}
+  \right)
+  \leq \frac{\alpha}{\beta}.
+\]
+It is therefore incorrect to read $\alpha/\beta$ as bounding unsafe hits
+alone while treating domain exit as a neutral outcome.
+
+This distinction is visible in the two-dimensional OU experiment with the
+enlarged target $[-0.5,0.5]^2$ and $\beta=2$.  The finite-difference
+committor solving $\mathcal LV=0$, with value zero on the target and $\beta$
+on the unsafe and domain boundaries, gives composite failure probabilities
+$V/\beta$ between $0.241$ and $0.555$ on $X_0$; their average under a uniform
+initial state is $0.370$.  Thus the smallest committor-derived threshold is
+approximately $\alpha=1.11$, and $\alpha/\beta\approx0.555$ is the
+\emph{worst-case} probability over $X_0$, not a prediction for a uniformly
+sampled initial state.
+
+As a numerical cross-check, $100{,}000$ exact-transition OU trajectories from
+a uniform initial state, inspected on a time grid of width $5\times10^{-4}$,
+gave target, unsafe, and domain-exit frequencies of $64.15\%$, $10.70\%$, and
+$25.15\%$, respectively.  The observed composite failure frequency was
+$35.85\%$, close to the finite-difference uniform average; the remaining
+difference is consistent with discretization in both calculations.  A
+separate Dirichlet solve for unsafe-before-target-or-exit gave an average of
+$10.4\%$ and a worst case of $13.8\%$ on $X_0$.  The apparent gap between
+$55.5\%$ and roughly $36\%$ is therefore mainly a worst-case-versus-average
+comparison, while the larger gap to roughly $11\%$ additionally omits domain
+exit from the failure event.
+
 \subsection{Asymptotic completeness of piecewise quadratic certificates}
 
 The theorem below retains the stronger exit-time formulation: it assumes the
