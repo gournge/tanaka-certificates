@@ -37,6 +37,8 @@ class TrainingCertificateConfiguration:
     normalize_constraint_losses: bool = True
     learning_rate: float = 3e-3
     boundary_loss_weight: float = 20.0
+    initial_loss_weight: float | None = None
+    unsafe_loss_weight: float | None = None
     domain_boundary_loss_weight: float = 20.0
     generator_loss_weight: float = 5.0
     nonnegativity_loss_weight: float = 20.0
@@ -51,6 +53,7 @@ class TrainingCertificateConfiguration:
     boundary_sampling_probability: float = 0.9
     generator_boundary_sampling_probability: float = 0.1
     generator_grid_resolution: int = 17
+    include_initial_in_generator_training: bool = False
     verifier_counterexample_interval: int = 0
     restore_best_verifier_checkpoint: bool = True
     generator_training_mode: Literal[
@@ -385,6 +388,18 @@ def _train_certificate(
                         ),
                     )
                 )
+            if config.include_initial_in_generator_training:
+                domain = torch.cat(
+                    (
+                        domain,
+                        _training_region_points(
+                            ras.initial,
+                            config.batch_size,
+                            dtype,
+                            config.boundary_sampling_probability,
+                        ),
+                    )
+                )
             if counterexamples.numel():
                 domain = torch.cat((domain, counterexamples))
             domain = domain.requires_grad_(True)
@@ -431,7 +446,17 @@ def _train_certificate(
             (parameter.square().mean() for parameter in regularized_parameters),
             zero,
         )
-        loss = config.boundary_loss_weight * regional_loss
+        initial_weight = (
+            config.boundary_loss_weight
+            if config.initial_loss_weight is None
+            else config.initial_loss_weight
+        )
+        unsafe_weight = (
+            config.boundary_loss_weight
+            if config.unsafe_loss_weight is None
+            else config.unsafe_loss_weight
+        )
+        loss = initial_weight * initial_loss + unsafe_weight * unsafe_loss
         loss = loss + config.domain_boundary_loss_weight * domain_boundary_loss
         loss = loss + config.nonnegativity_loss_weight * nonnegativity_loss
         loss = loss + config.generator_loss_weight * generator_loss
@@ -442,6 +467,8 @@ def _train_certificate(
         nn.utils.clip_grad_norm_(certificate.parameters(), config.gradient_clip)
         optimizer.step()
         final_losses = {
+            "initial": float(initial_loss.detach()),
+            "unsafe": float(unsafe_loss.detach()),
             "regional": float(regional_loss.detach()),
             "domain_boundary": float(domain_boundary_loss.detach()),
             "generator": float(generator_loss.detach()),
@@ -640,9 +667,15 @@ def _validate_inputs(sde, ras, config) -> None:
         raise ValueError(
             "epochs must be nonnegative and sizes/intervals must be positive"
         )
+    optional_weights = tuple(
+        weight
+        for weight in (config.initial_loss_weight, config.unsafe_loss_weight)
+        if weight is not None
+    )
     if (
         min(
             config.boundary_loss_weight,
+            *optional_weights,
             config.domain_boundary_loss_weight,
             config.generator_loss_weight,
             config.nonnegativity_loss_weight,
