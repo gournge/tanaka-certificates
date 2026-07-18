@@ -163,6 +163,29 @@ def make_ou_problem(
     alpha: float = 0.5,
 ) -> tuple[IsotropicOrnsteinUhlenbeck, ReachAvoidProblem]:
     """Return the two-dimensional Ornstein--Uhlenbeck reach-avoid problem."""
+    return _make_ou_problem(alpha, target_lower=(-0.1, -0.1), target_upper=(0.1, 0.1))
+
+
+def make_enlarged_target_ou_problem(
+    alpha: float = 0.5,
+    epsilon: float = 0.1,
+) -> tuple[IsotropicOrnsteinUhlenbeck, ReachAvoidProblem]:
+    """Return the OU problem with the enlarged target used for LP training."""
+    return _make_ou_problem(
+        alpha,
+        target_lower=(-0.5, -0.5),
+        target_upper=(0.5, 0.5),
+        epsilon=epsilon,
+    )
+
+
+def _make_ou_problem(
+    alpha: float,
+    *,
+    target_lower: tuple[float, float],
+    target_upper: tuple[float, float],
+    epsilon: float = 0.1,
+) -> tuple[IsotropicOrnsteinUhlenbeck, ReachAvoidProblem]:
     sde = IsotropicOrnsteinUhlenbeck(2, volatility=0.5)
     problem = ReachAvoidProblem(
         domain=create_hyperrectangle([-1.0, -1.25], [1.25, 0.75]),
@@ -170,10 +193,10 @@ def make_ou_problem(
         unsafe=HyperrectangleUnion(
             create_hyperrectangle([-0.2, -1.2], [0.2, -0.8]),
         ),
-        target=create_hyperrectangle([-0.1, -0.1], [0.1, 0.1]),
+        target=create_hyperrectangle(target_lower, target_upper),
         alpha=alpha,
         beta=2.0,
-        epsilon=0.1,
+        epsilon=epsilon,
     )
     return sde, problem
 

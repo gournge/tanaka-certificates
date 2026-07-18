@@ -63,6 +63,34 @@ def test_training_is_reproducible_from_configuration_seed():
         torch.testing.assert_close(left, right)
 
 
+def test_initial_and_unsafe_losses_can_be_weighted_independently():
+    config = TrainingCertificateConfiguration(
+        epochs=1,
+        batch_size=8,
+        hidden_width=2,
+        boundary_loss_weight=123.0,
+        initial_loss_weight=0.0,
+        unsafe_loss_weight=7.0,
+    )
+    sde = IsotropicOrnsteinUhlenbeck(2)
+
+    certificate = train_pwq_certificate_baseline(
+        sde, _problem(), training_configuration=config
+    )
+
+    losses = certificate.training_artifact.final_losses
+    expected = (
+        7.0 * losses["unsafe"]
+        + config.domain_boundary_loss_weight * losses["domain_boundary"]
+        + config.generator_loss_weight * losses["generator"]
+        + config.nonnegativity_loss_weight * losses["nonnegativity"]
+        + config.concavity_loss_weight * losses["concavity"]
+        + config.teacher_loss_weight * losses["teacher"]
+        + config.regularization_weight * losses["regularization"]
+    )
+    assert np.isclose(losses["total"], expected, rtol=1e-5)
+
+
 def test_region_corners_include_every_union_rectangle_corner():
     region = _problem().unsafe
     corners = _region_corners(region).numpy()

@@ -27,6 +27,9 @@ packages = ["tanaka_certificates"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: opt-in tests that run the production LP and formal verifier",
+]
 
 [tool.uv.sources]
 auto-lirpa = { git = "https://github.com/Verified-Intelligence/auto_LiRPA.git" }
