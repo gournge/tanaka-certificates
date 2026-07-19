@@ -36,7 +36,7 @@ Development documentation can be accessed through the [`docs/dev/index.md`](docs
 ├── tanaka_certificates/
 │   ├── nn/                     # Neural-certificate training utilities
 │   ├── sde/                    # Stochastic differential equation models
-│   ├── verifier/               # PWL and PWQ certificate verifiers
+│   ├── verifier/               # Multidimensional PWQ certificate verifiers
 │   ├── artifacts.py            # Experiment artifact path helpers
 │   ├── cell_discovery.py       # Cell discovery for piecewise networks
 │   ├── certificate.py          # Certificate abstractions
@@ -55,19 +55,16 @@ Development documentation can be accessed through the [`docs/dev/index.md`](docs
 
 ## Development
 
-Install the Python environment and generate the one-dimensional research plots
-with [uv](https://docs.astral.sh/uv/):
+Install the Python environment and run the test suite with
+[uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv sync --dev
-uv run python -m scripts.research.generate_one_dim_plots
+uv run pytest
 ```
 
-The plotting command writes each result to a named directory containing its
-timestamp and Git revision, such as
-`output/a1b2c3d_2026-07-01_14-30-00_ou_generator_three_cases/`. Pass
-`--output PATH` to use another artifact root. Run the test suite with
-`uv run pytest`.
+Plotting and experiment scripts write results to named directories under
+`output/`, including the timestamp and Git revision.
 
 ### Compiling TeX files
 

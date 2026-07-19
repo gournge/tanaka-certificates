@@ -1,7 +1,7 @@
 [project]
 name = "tanaka-certificates"
 version = "0.1.0"
-description = "Numerical experiments for one-dimensional Tanaka certificates"
+description = "Numerical experiments for multidimensional Tanaka certificates"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

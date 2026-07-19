@@ -1,25 +1,8 @@
-"""One- and multidimensional Ornstein--Uhlenbeck processes."""
-
-from dataclasses import dataclass
+"""Multidimensional Ornstein--Uhlenbeck processes."""
 
 import numpy as np
 
-from .base import State, SDE, SDEND
-
-
-@dataclass(frozen=True)
-class OrnsteinUhlenbeck1D(SDE):
-    """One-dimensional Ornstein--Uhlenbeck process."""
-
-    mean_reversion: float = 1.0
-    volatility: float = 1.0
-    long_term_mean: float = 0.0
-
-    def drift(self, t: float, x: State) -> State:
-        return self.mean_reversion * (self.long_term_mean - x)
-
-    def diffusion(self, t: float, x: State) -> State:
-        return 0.0 * x + self.volatility
+from .base import SDEND
 
 
 class IsotropicOrnsteinUhlenbeck(SDEND):

@@ -5,31 +5,17 @@ from abc import ABC, abstractmethod
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-State = float | NDArray[np.float64]
-
 
 class SDE(ABC):
-    """A scalar SDE of the form dX = drift(t, X) dt + diffusion(t, X) dW."""
+    """Base class for stochastic differential equations."""
 
     @abstractmethod
-    def drift(self, t: float, x: State) -> State:
+    def drift(self, t: float, x: NDArray[np.float64]) -> NDArray[np.float64]:
         """Evaluate the drift coefficient."""
 
     @abstractmethod
-    def diffusion(self, t: float, x: State) -> State:
+    def diffusion(self, t: float, x: NDArray[np.float64]) -> NDArray[np.float64]:
         """Evaluate the diffusion coefficient."""
-
-
-class SDE1D(SDE):
-    """A one-dimensional SDE of the form dX = drift(t, X) dt + diffusion(t, X) dW."""
-
-    def drift(self, t: float, x: float) -> float:
-        """Evaluate the drift coefficient."""
-        return super().drift(t, x)
-
-    def diffusion(self, t: float, x: float) -> float:
-        """Evaluate the diffusion coefficient."""
-        return super().diffusion(t, x)
 
 
 class SDEND(SDE):
@@ -56,41 +42,35 @@ class SDEND(SDE):
 
 
 class EulerMaruyama:
-    """Euler--Maruyama integrator for scalar states or batches of scalar states."""
+    """Euler--Maruyama integrator for multidimensional states."""
 
     def step(
         self,
-        sde: SDE,
+        sde: SDEND,
         t: float,
-        x: State,
+        x: ArrayLike,
         dt: float,
         rng: np.random.Generator,
-    ) -> State:
+    ) -> NDArray[np.float64]:
         if dt <= 0:
             raise ValueError("dt must be positive")
 
-        if isinstance(sde, SDEND):
-            state = np.asarray(x, dtype=float)
-            if state.shape != (sde.state_dim,):
-                raise ValueError(f"x must have shape ({sde.state_dim},)")
-            drift = np.asarray(sde.drift(t, state), dtype=float)
-            diffusion = np.asarray(sde.diffusion(t, state), dtype=float)
-            if drift.shape != state.shape:
-                raise ValueError(f"drift must have shape ({sde.state_dim},)")
-            expected_diffusion_shape = (sde.state_dim, sde.noise_dim)
-            if diffusion.shape != expected_diffusion_shape:
-                raise ValueError(
-                    f"diffusion must have shape {expected_diffusion_shape}"
-                )
-            noise = rng.standard_normal(sde.noise_dim)
-            return state + drift * dt + diffusion @ noise * np.sqrt(dt)
-
-        noise = rng.standard_normal(np.shape(x))
-        return x + sde.drift(t, x) * dt + sde.diffusion(t, x) * np.sqrt(dt) * noise
+        state = np.asarray(x, dtype=float)
+        if state.shape != (sde.state_dim,):
+            raise ValueError(f"x must have shape ({sde.state_dim},)")
+        drift = np.asarray(sde.drift(t, state), dtype=float)
+        diffusion = np.asarray(sde.diffusion(t, state), dtype=float)
+        if drift.shape != state.shape:
+            raise ValueError(f"drift must have shape ({sde.state_dim},)")
+        expected_diffusion_shape = (sde.state_dim, sde.noise_dim)
+        if diffusion.shape != expected_diffusion_shape:
+            raise ValueError(f"diffusion must have shape {expected_diffusion_shape}")
+        noise = rng.standard_normal(sde.noise_dim)
+        return state + drift * dt + diffusion @ noise * np.sqrt(dt)
 
     def simulate(
         self,
-        sde: SDE,
+        sde: SDEND,
         x0: ArrayLike,
         T: float,
         n_steps: int,
@@ -103,7 +83,7 @@ class EulerMaruyama:
             raise ValueError("n_steps must be positive")
 
         initial = np.asarray(x0, dtype=float)
-        if isinstance(sde, SDEND) and initial.shape != (sde.state_dim,):
+        if initial.shape != (sde.state_dim,):
             raise ValueError(f"x0 must have shape ({sde.state_dim},)")
         times = np.linspace(0.0, T, n_steps + 1)
         states = np.empty((n_steps + 1, *initial.shape), dtype=float)
