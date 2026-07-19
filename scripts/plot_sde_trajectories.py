@@ -1,4 +1,4 @@
-"""Simulate and plot trajectories of one- or multidimensional SDEs."""
+"""Simulate and plot trajectories of multidimensional SDEs."""
 
 from argparse import ArgumentParser
 from collections.abc import Mapping, Sequence
@@ -12,7 +12,6 @@ from tanaka_certificates import ResultArtifact
 from tanaka_certificates.sde import (
     EulerMaruyama,
     IsotropicOrnsteinUhlenbeck,
-    SDE,
     SDEND,
 )
 
@@ -38,7 +37,7 @@ class IsotropicConstantCoefficients(SDEND):
 
 
 def plot_trajectories(
-    sdes: Mapping[str, SDE],
+    sdes: Mapping[str, SDEND],
     initial_states: Mapping[str, ArrayLike],
     *,
     horizon: float = 5.0,
@@ -48,14 +47,16 @@ def plot_trajectories(
 ) -> ResultArtifact:
     """Simulate named SDEs and save their trajectories in a result artifact.
 
-    One-dimensional paths are plotted against time, two-dimensional paths in
-    state space, and higher-dimensional paths as one time series per component.
+    Two-dimensional paths are plotted in state space and higher-dimensional
+    paths as one time series per component.
     Every SDE name must have a corresponding initial state.
     """
     if not sdes:
         raise ValueError("at least one SDE is required")
     if not seeds:
         raise ValueError("at least one seed is required")
+    if any(sde.state_dim < 2 for sde in sdes.values()):
+        raise ValueError("all SDEs must have at least two state dimensions")
     missing = set(sdes) - set(initial_states)
     if missing:
         raise ValueError(f"missing initial states for: {', '.join(sorted(missing))}")
@@ -66,21 +67,13 @@ def plot_trajectories(
     solver = EulerMaruyama()
 
     for axis, (name, sde) in zip(axes[:, 0], sdes.items()):
-        dimension = sde.state_dim if isinstance(sde, SDEND) else 1
+        dimension = sde.state_dim
         for seed in seeds:
             time, states = solver.simulate(
                 sde, initial_states[name], horizon, n_steps, seed=seed
             )
             states = np.asarray(states)
-            if dimension == 1:
-                axis.plot(
-                    time,
-                    states,
-                    color=TRAJECTORY_COLOR,
-                    alpha=TRAJECTORY_ALPHA,
-                    lw=0.8,
-                )
-            elif dimension == 2:
+            if dimension == 2:
                 axis.plot(
                     states[:, 0],
                     states[:, 1],
@@ -136,6 +129,8 @@ def main() -> ResultArtifact:
     parser.add_argument("--steps", type=int, default=5_000)
     parser.add_argument("--paths", type=int, default=100)
     args = parser.parse_args()
+    if args.dimension < 2:
+        parser.error("--dimension must be at least 2")
     if len(args.initial) != args.dimension:
         parser.error("--initial must contain exactly --dimension values")
 

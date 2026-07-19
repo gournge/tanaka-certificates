@@ -1,121 +1,16 @@
 """Predefined stochastic reach-avoid problems."""
 
-from dataclasses import dataclass
-
 import numpy as np
 
-from tanaka_certificates.cell_discovery import (
-    Cell,
-    create_1d_piecewise_linear_cells,
-)
-from tanaka_certificates.nn import create_1d_certificate_given_cells
-from tanaka_certificates.ra import ReachAvoidProblem, ReachAvoidProblem1D
+from tanaka_certificates.ra import ReachAvoidProblem
 from tanaka_certificates.regions import (
     HyperrectangleUnion,
-    Interval,
-    IntervalUnion,
     create_hyperrectangle,
 )
 from tanaka_certificates.sde import (
-    BrownianMotion,
     IsotropicOrnsteinUhlenbeck,
-    OrnsteinUhlenbeck1D,
     SDEND,
 )
-
-
-@dataclass(frozen=True)
-class PiecewiseLinear1DCertificateSetup:
-    """Parameters for a one-dimensional piecewise-linear certificate."""
-
-    name: str
-    description: str
-    cells: tuple[Cell, ...]
-
-    def make_certificate(self):
-        return create_1d_certificate_given_cells(list(self.cells))
-
-
-def _pwl_cells(knots, left_slope, right_slope) -> tuple[Cell, ...]:
-    return tuple(create_1d_piecewise_linear_cells(knots, left_slope, right_slope))
-
-
-BROWNIAN_PWL_1D_CERTIFICATE_SETUPS = (
-    PiecewiseLinear1DCertificateSetup(
-        name="negative_absolute_value",
-        description="V(x) = -abs(x)",
-        cells=_pwl_cells([(0.0, 0.0)], 1.0, -1.0),
-    ),
-    PiecewiseLinear1DCertificateSetup(
-        name="identity",
-        description="V(x) = x",
-        cells=_pwl_cells([(0.0, 0.0)], 1.0, 1.0),
-    ),
-    PiecewiseLinear1DCertificateSetup(
-        name="absolute_value",
-        description="V(x) = abs(x)",
-        cells=_pwl_cells([(0.0, 0.0)], -1.0, 1.0),
-    ),
-    PiecewiseLinear1DCertificateSetup(
-        name="almost_trapezoid_positive_middle",
-        description="almost a trapezoid with slopes 1, 0.1, -1",
-        cells=_pwl_cells([(0.0, 0.0), (1.0, 0.1)], 1.0, -1.0),
-    ),
-    PiecewiseLinear1DCertificateSetup(
-        name="almost_trapezoid_negative_middle",
-        description="almost a trapezoid with slopes -1, -0.1, 1",
-        cells=_pwl_cells([(0.0, 0.0), (1.0, -0.1)], -1.0, 1.0),
-    ),
-    PiecewiseLinear1DCertificateSetup(
-        name="letter_m",
-        description="letter M with one concavity-violating kink",
-        cells=_pwl_cells([(0.0, 0.0), (1.0, -0.1), (2.0, 0.1)], 1.0, -1.0),
-    ),
-    PiecewiseLinear1DCertificateSetup(
-        name="bad_kink_outside_domain",
-        description="bad kink outside the reach-avoid domain",
-        cells=_pwl_cells([(0.0, 0.0), (200.0, -1.0)], 1.0, 1.0),
-    ),
-)
-
-
-ORNSTEIN_UHLENBECK_PWL_1D_CERTIFICATE_SETUP = PiecewiseLinear1DCertificateSetup(
-    name="ornstein_uhlenbeck_three_kink",
-    description="three-kink OU certificate",
-    cells=_pwl_cells([(-0.5, 0.5), (0.0, 0.25), (0.5, 0.5)], -1.0, 1.0),
-)
-
-
-def make_brownian_pwl_1d_problem() -> tuple[BrownianMotion, ReachAvoidProblem1D]:
-    """Return the one-dimensional Brownian reach-avoid verifier example."""
-    return BrownianMotion(), ReachAvoidProblem1D(
-        domain=IntervalUnion([Interval(-100.0, 100.0)]),
-        initial=IntervalUnion([Interval(-1.5, -0.5)]),
-        unsafe=IntervalUnion([Interval(1.5, 2.0)]),
-        target=IntervalUnion([Interval(-2.0, -1.5)]),
-        alpha=-0.4,
-        beta=-0.02,
-        epsilon=0.0,
-    )
-
-
-def make_ornstein_uhlenbeck_pwl_1d_problem(
-    epsilon: float = 1.0,
-) -> tuple[OrnsteinUhlenbeck1D, ReachAvoidProblem1D]:
-    """Return the one-dimensional OU reach-avoid verifier example."""
-    return OrnsteinUhlenbeck1D(
-        mean_reversion=1.0,
-        volatility=1.0,
-        long_term_mean=0.0,
-    ), ReachAvoidProblem1D(
-        domain=IntervalUnion([Interval(-2.0, 2.0)]),
-        initial=IntervalUnion([Interval(-1.5, -1.25), Interval(1.25, 1.5)]),
-        unsafe=IntervalUnion([Interval(-2.0, -2.0), Interval(2.0, 2.0)]),
-        target=IntervalUnion([Interval(-1.0, 1.0)]),
-        alpha=1.5,
-        beta=2.0,
-        epsilon=epsilon,
-    )
 
 
 class ConstantDriftBrownian2D(SDEND):

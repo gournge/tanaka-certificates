@@ -2,13 +2,13 @@ from enum import Enum
 
 from tanaka_certificates.certificate import Certificate
 from tanaka_certificates.ra import ReachAvoidProblem
-from tanaka_certificates.sde.base import SDE
+from tanaka_certificates.sde.base import SDEND
 
 
 class Verifier:
     def __init__(
         self,
-        sde: SDE,
+        sde: SDEND,
         reach_avoid_problem: ReachAvoidProblem,
         certificate: Certificate | None,
     ):

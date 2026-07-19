@@ -41,24 +41,6 @@ class Cell:
             return False
         return bool(np.all(self.A @ point <= self.b + atol))
 
-    def interval_bounds(self, *, atol: float = 1e-12) -> tuple[float, float]:
-        """Return the interval represented by a one-dimensional cell."""
-        if self.Q.shape != (1, 1) or self.p.shape != (1,):
-            raise ValueError("interval bounds require a one-dimensional cell")
-        lower, upper = -np.inf, np.inf
-        for row, bound in zip(self.A, self.b):
-            coefficient = float(row[0])
-            if coefficient > atol:
-                upper = min(upper, float(bound) / coefficient)
-            elif coefficient < -atol:
-                lower = max(lower, float(bound) / coefficient)
-            elif bound < -atol:
-                raise ValueError("cell contains an infeasible constant constraint")
-        if lower > upper + atol:
-            raise ValueError("cell represents an empty interval")
-        return lower, upper
-
-
 class FeasibilityStatus(str, Enum):
     """Conservative outcome of a full-dimensional polyhedron check."""
 
@@ -86,72 +68,6 @@ class CellDiscoveryResult:
     @property
     def is_complete(self) -> bool:
         return not self.unresolved_regions
-
-
-def create_1d_affine_cell(
-    index: int,
-    lower: float,
-    upper: float,
-    slope: float,
-    intercept: float,
-) -> Cell:
-    """Create a cell carrying ``V(x) = slope * x + intercept`` on an interval."""
-    if lower >= upper:
-        raise ValueError("cell interval must have positive length")
-    normals = []
-    bounds = []
-    if np.isfinite(upper):
-        normals.append([1.0])
-        bounds.append(upper)
-    if np.isfinite(lower):
-        normals.append([-1.0])
-        bounds.append(-lower)
-    return Cell(
-        index=index,
-        Q=np.zeros((1, 1)),
-        p=np.array([slope], dtype=float),
-        c=float(intercept),
-        A=np.asarray(normals, dtype=float).reshape(-1, 1),
-        b=np.asarray(bounds, dtype=float),
-    )
-
-
-def create_1d_piecewise_linear_cells(
-    knots: list[tuple[float, float]],
-    leftmost_slope: float,
-    rightmost_slope: float,
-) -> list[Cell]:
-    """Create the affine cells of a continuous PWL function through ``knots``."""
-    if not knots:
-        raise ValueError("at least one knot is required")
-    points = sorted((float(x), float(value)) for x, value in knots)
-    if any(left[0] == right[0] for left, right in zip(points, points[1:])):
-        raise ValueError("knots must have distinct coordinates")
-
-    cells = [
-        create_1d_affine_cell(
-            0,
-            -np.inf,
-            points[0][0],
-            leftmost_slope,
-            points[0][1] - leftmost_slope * points[0][0],
-        )
-    ]
-    for index, ((x0, y0), (x1, y1)) in enumerate(
-        zip(points, points[1:]), start=1
-    ):
-        slope = (y1 - y0) / (x1 - x0)
-        cells.append(create_1d_affine_cell(index, x0, x1, slope, y0 - slope * x0))
-    cells.append(
-        create_1d_affine_cell(
-            len(cells),
-            points[-1][0],
-            np.inf,
-            rightmost_slope,
-            points[-1][1] - rightmost_slope * points[-1][0],
-        )
-    )
-    return cells
 
 
 @dataclass
@@ -669,25 +585,4 @@ def discover_cells_result_from_certificate(
         piecewise_quadratic_activation=(
             certificate.get_last_layer_piecewise_quadratic_activation()
         ),
-    )
-
-
-def discover_1d_cells_from_network_weights(
-    relu_network_weights: list[tuple[np.ndarray, np.ndarray]],
-    lam: np.ndarray,
-    c: float,
-    piecewise_quadratic_activation: PiecewiseQuadratic1D | None = None,
-) -> list[Cell]:
-    """One-dimensional adapter around :func:`discover_cells_from_network_weights`."""
-    if (
-        not relu_network_weights
-        or np.asarray(relu_network_weights[0][0]).ndim != 2
-        or np.asarray(relu_network_weights[0][0]).shape[1] != 1
-    ):
-        raise ValueError("the network must have one-dimensional input")
-    return discover_cells_from_network_weights(
-        relu_network_weights,
-        lam,
-        c,
-        piecewise_quadratic_activation,
     )
