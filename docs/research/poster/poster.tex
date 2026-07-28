@@ -1,12 +1,11 @@
 % !TEX program = pdflatex
 \documentclass[10pt]{article}
-\usepackage[a3paper,landscape,left=7mm,right=7mm,top=10mm,bottom=10mm]{geometry}
+\usepackage[a3paper,portrait,left=8mm,right=8mm,top=8mm,bottom=8mm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{tgschola}
 \usepackage{microtype}
 \usepackage{amsmath,amssymb,mathtools,bm}
-\usepackage{booktabs,array,tabularx}
 \usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage{tikz}
@@ -14,292 +13,399 @@
 \usepackage{graphicx}
 \usepackage{adjustbox}
 \usepackage{ragged2e}
+\usepackage{listings}
 \usepackage{hyperref}
-\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+\hypersetup{colorlinks=true,urlcolor=Accent}
 
 % ---------- Visual system ----------
 \definecolor{Accent}{HTML}{3478E5}
+\definecolor{AccentDark}{HTML}{2458A6}
 \definecolor{Ink}{HTML}{252B33}
 \definecolor{Muted}{HTML}{68717D}
 \definecolor{Rule}{HTML}{D7DCE2}
 \definecolor{Pale}{HTML}{F1F6FF}
 \definecolor{Soft}{HTML}{F7F8FA}
 \definecolor{Good}{HTML}{2E7D5B}
-\definecolor{Warm}{HTML}{A7641D}
+\definecolor{Bad}{HTML}{B9413E}
+\definecolor{Delft}{HTML}{00A6D6}
 
-\newcommand{\titlefont}{\bfseries}
-\newcommand{\codefont}{\ttfamily}
+\lstdefinestyle{posterpython}{
+  language=Python,
+  basicstyle=\ttfamily\fontsize{6.8}{7.5}\selectfont,
+  keywordstyle=\color{AccentDark}\bfseries,
+  commentstyle=\color{Good}\itshape,
+  stringstyle=\color{Bad},
+  frame=single,
+  framerule=.5pt,
+  rulecolor=\color{Rule},
+  backgroundcolor=\color{Soft},
+  numbers=left,
+  numberstyle=\fontsize{5.5}{6.2}\selectfont\color{Muted},
+  numbersep=5pt,
+  showstringspaces=false,
+  columns=fullflexible,
+  keepspaces=true,
+  xleftmargin=2.8mm,
+  framexleftmargin=2.2mm
+}
+
 \color{Ink}
 \pagestyle{empty}
 \setlength{\parindent}{0pt}
-\setlength{\parskip}{2.5pt}
-\setlist[itemize]{leftmargin=1.2em,itemsep=1.2pt,topsep=1.5pt}
+\setlength{\parskip}{2.2pt}
+\setlist[itemize]{leftmargin=1.25em,itemsep=1.2pt,topsep=1.5pt}
+\setlist[enumerate]{leftmargin=1.45em,itemsep=1.2pt,topsep=1.5pt}
 
 % ---------- Reusable poster objects ----------
-\newcommand{\blue}[1]{\textcolor{Accent}{#1}}
+\newcommand{\titlefont}{\bfseries}
 \newcommand{\postersection}[1]{%
-  \vspace{1.2mm}\noindent{\raggedright\fontsize{17.5}{19.5}\selectfont\titlefont #1\par}
-  \vspace{.6mm}\textcolor{Rule}{\rule{\linewidth}{0.6pt}}\vspace{.9mm}}
+  \vspace{1.1mm}{\raggedright\fontsize{16}{18}\selectfont\titlefont
+  \textcolor{AccentDark}{#1}\par}\vspace{.45mm}
+  \textcolor{Rule}{\rule{\linewidth}{0.7pt}}\vspace{.7mm}}
 \newcommand{\postersubsection}[1]{%
-  \vspace{.8mm}{\fontsize{13.2}{14.5}\selectfont\titlefont #1}\par\vspace{.3mm}}
-\newcommand{\tinylabel}[1]{{\codefont\fontsize{7.5}{8.3}\selectfont\color{Muted} #1}}
-\newcommand{\keyeq}[1]{\begin{tcolorbox}[enhanced,boxrule=.7pt,colframe=Ink,
-  colback=white,arc=2.2mm,left=2.5mm,right=2.5mm,top=1.8mm,bottom=1.8mm]#1\end{tcolorbox}}
-
-\newtcolorbox{infobox}[1][]{enhanced,breakable,boxrule=.7pt,colframe=Rule,
-  colback=Soft,arc=2.2mm,left=2.5mm,right=2.5mm,top=1.8mm,bottom=1.8mm,#1}
-\newtcolorbox{bluebox}[1][]{enhanced,breakable,boxrule=.9pt,colframe=Accent,
-  colback=Pale,arc=2.2mm,left=2.5mm,right=2.5mm,top=1.8mm,bottom=1.8mm,#1}
-
-% Preserve the central message as a reusable blue object.
-\newcommand{\coreideabox}{%
-\begin{bluebox}
-\textbf{Core idea:}
-\begin{enumerate}[leftmargin=1.5em,itemsep=.5mm,topsep=.6mm]
-\item Checking the certificate conditions is much less expensive for ReLU
-networks.
-\item Because we can handle a piecewise quadratic network, we can compose
-multiple certificates by taking their minimum.
-\end{enumerate}
-\end{bluebox}}
-
-\newcommand{\statusdot}[1]{\tikz[baseline=-.55ex]\fill[#1] (0,0) circle (1.25mm);}
+  \vspace{.7mm}{\fontsize{12.2}{13.5}\selectfont\titlefont #1}\par\vspace{.2mm}}
+\newcommand{\keyeq}[1]{\begin{tcolorbox}[enhanced,boxrule=.8pt,colframe=Accent,
+  colback=Pale,arc=2mm,left=2.2mm,right=2.2mm,top=1.5mm,bottom=1.5mm]#1\end{tcolorbox}}
+\newtcolorbox{infobox}[1][]{enhanced,breakable,boxrule=.65pt,colframe=Rule,
+  colback=Soft,arc=2mm,left=2.2mm,right=2.2mm,top=1.5mm,bottom=1.5mm,#1}
+\newtcolorbox{theorembox}[1][]{enhanced,breakable,boxrule=.9pt,colframe=Accent,
+  colback=Pale,arc=2mm,left=2.2mm,right=2.2mm,top=1.5mm,bottom=1.5mm,#1}
+\newtcolorbox{motivationbox}[1][]{enhanced,boxrule=.8pt,colframe=Accent,
+  colback=Soft,arc=2.2mm,left=2.6mm,right=2.6mm,top=1.8mm,bottom=1.8mm,#1}
+\newcommand{\researchq}[2]{\begin{tcolorbox}[enhanced,boxrule=.8pt,colframe=Accent,
+  colback=Pale,arc=1.7mm,left=1.8mm,right=1.8mm,top=1.2mm,bottom=1.2mm]
+  \textbf{Research Question #1:} #2\end{tcolorbox}}
+\newcommand{\statusdot}[1]{\tikz[baseline=-.55ex]\fill[#1] (0,0) circle (1.15mm);}
 
 \begin{document}
 \begin{adjustbox}{max totalsize={\textwidth}{\textheight},center}
 \begin{minipage}{\textwidth}
-\begin{minipage}[t]{\textwidth}
-\centering
-\resizebox{.97\textwidth}{!}{\titlefont It\^o--Tanaka Certificates: Towards Scalable SDE Certification through Compositionality}\par
-\vspace{1.4mm}
-{\fontsize{11.5}{13}\selectfont \blue{Filip Morawiec}\quad $\cdot$ \quad
-University of Birmingham Summer Research Programme \quad $\cdot$ \quad 2026}\par
-\vspace{.7mm}
-{\fontsize{9.2}{10.5}\selectfont\color{Muted}
-From exact reach--avoid guarantees to neural region discovery and local-time conditions by construction.}
+
+% ======================== HEADER ========================
+\begin{minipage}[c]{.17\textwidth}
+  \includegraphics[width=.88\linewidth]{logos/tu-delft.png}
+\end{minipage}\hfill
+\begin{minipage}[c]{.62\textwidth}
+  \centering
+  {\fontsize{28}{31}\selectfont\titlefont It\^o--Tanaka Certificates\par}
+%  \vspace{.5mm}
+%  {\fontsize{16}{18}\selectfont\titlefont
+%  Towards scalable SDE certification through compositionality\par}
+  \vspace{1.3mm}
+  {\fontsize{10.5}{12}\selectfont
+  \textcolor{AccentDark}{\textbf{Filip Morawiec}}\quad$\cdot$\quad
+  2026 University of Birmingham Summer Research Programme in AI Safety\par}
+  {\fontsize{9.3}{10.6}\selectfont
+  Supervised by \textbf{Grigory Neustroev} in the lab of
+  \textbf{Prof.\ Mirco Giacobbe}}
+\end{minipage}\hfill
+\begin{minipage}[c]{.17\textwidth}
+  \raggedleft\includegraphics[width=.98\linewidth]{logos/university-of-birmingham.png}
 \end{minipage}
 
-\vspace{3mm}
-\fontsize{9}{10.5}\selectfont
-% ======================== FOUR READING COLUMNS ========================
-\begin{minipage}[t]{0.235\textwidth}
-\postersection{1. Introduction}
-Consider the problem of ensuring that a continuous system behaves safely under
-uncertainty---for example, that a humanoid robot does not fall over while
-walking. One way to ensure safety is to perform many experiments. For such
-complex systems, however, this is not feasible. Neural Continuous-Time
-Supermartingale Certificates~[1] instead give exact probabilistic guarantees of
-safety for stochastic differential equations (SDEs) of the form
+\vspace{2.2mm}
+\fontsize{9.15}{10.65}\selectfont
+\begin{minipage}[t]{.493\textwidth}
+\begin{motivationbox}
+\textbf{Motivation (the big picture).}
+For a complex stochastic system such as a humanoid robot, we want to formally
+prove safety---for example, that it will not fall while walking.
+\end{motivationbox}
+\end{minipage}\hfill
+\begin{minipage}[t]{.493\textwidth}
+\begin{motivationbox}
+\textbf{Motivation (the realistic picture).}
+Previous work~[1] assumes that $V$ is twice continuously differentiable.
+Weakening this assumption could lead to faster verification.
+% and/or compositionality.
+\end{motivationbox}
+\end{minipage}
+
+\vspace{1.2mm}
+% ======================== THREE READING COLUMNS ========================
+\begin{minipage}[t]{.322\textwidth}
+\postersection{Introduction}
+We study stochastic differential equations
 \[
-dX_t=f(X_t)\,dt+\sigma(X_t)\,dW_t,
-\qquad X_t\in K\subset\mathbb R^d,
+ dX_t=f(X_t)\,dt+\sigma(X_t)\,dW_t,
+ \qquad X_t\in K\subset\mathbb R^d,
 \]
-over a compact domain $K\subset\mathbb R^d$.
-
-\begin{center}
-\includegraphics[width=\linewidth]{figures/intro_martingale_committor.pdf}
-\end{center}
-
-\postersubsection{Problem setup}
-Given an initial set $X_0$, a target set $X_T$, an unsafe set $X_u$, and
-$\alpha<\beta$, assume we find a nonnegative function $V:K\to\mathbb R$ such
-that
+on compact $K$. Given initial, target, and unsafe sets $X_0,X_T,X_u$, choose
+$0\leq\alpha<\beta$ and a \emph{nonnegative} $V:K\to\mathbb R$ satisfying
 \[
-\sup_{X_0}V\leq\alpha<\beta,
-\qquad
-\inf_{X_u}V\geq\beta,
-\qquad
-\inf_{\partial K\setminus X_T}V\geq\beta.
+ \sup_{X_0}V\leq\alpha,
+ \quad \inf_{X_u}V\geq\beta,
+ \quad \inf_{\partial K\setminus X_T}V\geq\beta.
 \]
-Stop on reaching $X_T$, $\partial K$, or the superlevel set $\{V\geq\beta\}$.
+Let $\tau$ stop the process on reaching $X_T$, $\partial K$, or
+$\{V\geq\beta\}$.
 
-\keyeq{
-\textbf{Theorem (reach--avoid guarantee).} If the stopped process
+\keyeq{\textbf{Theorem (reach--avoid guarantee).} If
 $V(X_{t\wedge\tau})$ is a supermartingale, then
 \[
-\mathbb P\!\left(
-\tau_{X_u}\wedge\tau_{\partial K}<\tau_{X_T}
-\right)
-\leq\frac{\alpha}{\beta}.
+ \mathbb P(\tau_{X_u}\wedge\tau_{\partial K}<\tau_{X_T})
+ \leq \alpha/\beta.
 \]
-Thus failure includes either reaching the unsafe set or leaving the certified
-domain before the target. Both imply reaching certificate level $\beta$ by
-the stopping time.
-}
-
-\postersection{2. It\^o--Tanaka certificates}
-In practice, we want to find $V$ using neural networks. To ensure that $V$ is a
-supermartingale, we must check conditions relating $V$, $f$, and $\sigma$.
-Suppose $V$ is continuous and twice differentiable inside polyhedral cells
-$K_i$. Expanding the multidimensional It\^o--Tanaka formula separates the
-drift, martingale, and interface-local-time effects:
-\begin{align*}
-V(X_{t\wedge\tau})={}&V(X_0)+\int_0^{t\wedge\tau}\mathcal LV(X_s)\,ds+M_t\\[-1mm]
-&+\frac12\sum_F\int_0^{t\wedge\tau}\gamma_F(X_s)\,dL_s^F,
-\end{align*}
-where
-\[
-\mathcal LV=\nabla V^\top f+\tfrac12\operatorname{tr}(\sigma\sigma^\top\nabla^2V),
-\quad
-\gamma_F=(\nabla V_j-\nabla V_i)^\top n_{i\to j,F}.
-\]
-
-\begin{bluebox}
-\textbf{Theorem (It\^o--Tanaka certificate).} If the generator condition
-$\mathcal LV_i\leq0$ and the local-time condition $\gamma_F\leq0$
-hold outside $X_T$ and below $\beta$, then---under the standard integrability
-assumption---$V(X_{t\wedge\tau})$ is a supermartingale.
-\end{bluebox}
-\end{minipage}\hfill
-% --------------------------------------------------------
-\begin{minipage}[t]{0.235\textwidth}
-\postersection{3. Piecewise-quadratic neural network}
-We parameterize the certificate as
-\[
-V(x)=\sum_{k=1}^{m}\lambda_k\phi(z_k(x))+c,
-\]
-where
-\[
-z(x)=\texttt{NN}(x)
-=W_L\operatorname{ReLU}\!\bigl(\cdots
-\operatorname{ReLU}(W_1x+b_1)\cdots\bigr)+b_L
-\]
-and $\phi=\texttt{PiecewiseQuadratic1D}$ is a fixed continuous
-piecewise-quadratic activation.
-
-The hidden ReLU network partitions the input domain into polyhedral cells. On
-each cell, $z(x)$ is affine; after refining by the pieces of $\phi$, the scalar
-certificate has the exact form
-\[
-V_i(x)=c_i+p_i^\top x+\tfrac12x^\top Q_i x,
-\qquad K_i=\{x:A_ix\leq b_i\}.
-\]
-Thus $\nabla V_i=p_i+Q_ix$ and $\nabla^2V_i=Q_i$ are explicit, making the
-generator and interface conditions algebraic.
-
-\begin{infobox}
-\textbf{Why not a plain ReLU certificate?} A plain ReLU network is only
-piecewise linear and has no curvature inside its cells. Consider
-$dX_t=dt+\sqrt2\,dW_t$ on $[0,1]$, and require
-$V(0)<V(1)$. For continuous piecewise-linear $V$, the local-time condition
-makes the slopes nonincreasing. Yet increasing overall requires the first
-linear piece to have slope $a_i>0$. Since $V''=0$ in its interior,
-\[
-\mathcal LV=V'+\tfrac12(2)V''=a_i>0,
-\]
-contradicting the generator condition. Kinks alone cannot repair this failure.
+The proof is the maximal inequality for the nonnegative stopped process.}
 
 \begin{center}
-\includegraphics[width=.98\linewidth]{../log/figures/motivating_counterexample.pdf}
+\includegraphics[width=\linewidth,trim=0 0 0 48,clip]{figures/intro_martingale_committor.pdf}
 \end{center}
+{\fontsize{7.4}{8.4}\selectfont\color{Muted}
+\textbf{Figure 1.} An ideal reach--avoid certificate and realizations of the
+stopped martingale $V(X_{t\wedge\tau})$. Simulations illustrate the process;
+the certificate provides the guarantee.\par}
 
-\textbf{Curvature repairs the failure.} The quadratic
-$V(x)=2x-x^2$ has the same endpoint values, while
+\vspace{1mm}
+\textcolor{Rule}{\rule{\linewidth}{0.7pt}}\par
+\vspace{.7mm}
+\textbf{Following the motivations given above, the following research
+questions arise:}\par
+\vspace{.7mm}
+
+\researchq{1}{Can non-$C^2$ certificates be valid?}
+\textbf{Finding:} Yes. The
+It\^o--Tanaka--Meyer formula accounts for kinks and the infinitesimal time
+spent at them.
+\researchq{2}{What is a useful class of certificates?}
+\textbf{Finding:} We
+identify three important properties: piecewise-quadratic structure,
+representational power, and local-time safety by construction through our
+\textbf{Deep Residual ICNN}.
+\researchq{3}{Do these certificates work in practice?}
+\textbf{Finding:} Yes,
+but so far only in very simplified settings. We identify useful techniques
+and several failure modes.
+
+\postersection{1. Validity of non-$C^2$ certificates}
+Let $V$ be continuous and $C^2$ on each polyhedral cell $K_i$. Across a shared
+facet $F$, orient $n_{i\to j,F}$ from $K_i$ to $K_j$ and define the
+normal-gradient jump
 \[
-\mathcal LV=(2-2x)+\tfrac12(2)(-2)=-2x\leq0.
+ \gamma_F(x)=\bigl(\nabla V_j(x)-\nabla V_i(x)\bigr)^\top n_{i\to j,F}.
 \]
-The negative curvature contribution compensates for the positive drift.
+The multidimensional It\^o--Tanaka formula is
+\begin{align*}
+ V(X_{t\wedge\tau})={}&V(X_0)
+ +\int_0^{t\wedge\tau}\mathcal LV(X_s)\,ds+M_t\\[-1mm]
+ &+\frac12\sum_F\int_0^{t\wedge\tau}\gamma_F(X_s)\,dL_s^F,
+\end{align*}
+where
+\[
+ \mathcal LV=\nabla V^\top f+\tfrac12
+ \operatorname{tr}(\sigma\sigma^\top\nabla^2V),
+\]
+and $L^F$ is nondecreasing surface local time.
+
+\begin{theorembox}
+\textbf{Theorem (It\^o--Tanaka certificate).}
+Assume the set constraints above, the stochastic integral $M_t$ is a true
+martingale, and below level $\beta$ outside $X_T$:
+\[
+ \mathcal LV_i(x)\leq0,\qquad \gamma_F(x)\leq0
+\]
+on every cell and every shared facet. Then $V(X_{t\wedge\tau})$ is a
+supermartingale and the reach--avoid bound holds.
+\end{theorembox}
+
+\textbf{Proof sketch.} For $s\leq t$, apply the formula on $(s,t]$ and
+condition on $\mathcal F_s$. The generator integral is nonpositive;
+$dL^F\geq0$ and $\gamma_F\leq0$ make every interface integral nonpositive;
+the martingale increment has conditional mean zero. Hence
+\[
+ \mathbb E[V(X_{t\wedge\tau})\mid\mathcal F_s]
+ \leq V(X_{s\wedge\tau}).\qquad\square
+\]
+
+\end{minipage}\hfill
+% --------------------------------------------------------
+\begin{minipage}[t]{.322\textwidth}
+\postersection{2. A useful class of non-$C^2$ certificates}
+\postersubsection{2.1 Piecewise-quadratic structure}
+We parameterize
+\[
+ V(x)=\sum_{k=1}^m\lambda_k\phi(z_k(x))+c,
+ \quad z(x)=\texttt{ReLUNN}(x),
+\]
+where $\phi$ is a fixed continuous piecewise-quadratic activation. The ReLU
+network partitions $K$ into polyhedral cells and, after refinement by $\phi$,
+\[
+ V_i(x)=c_i+p_i^\top x+\tfrac12x^\top Q_i x.
+\]
+Thus $\nabla V_i=p_i+Q_ix$ and $\nabla^2V_i=Q_i$ are explicit, turning the
+generator and interface requirements into algebraic checks.
+
+\begin{infobox}
+\textbf{Why plain ReLU is insufficient.} For
+$dX_t=dt+\sqrt2\,dW_t$ on $[0,1]$, suppose $V(0)<V(1)$. A continuous
+piecewise-linear $V$ satisfying $\gamma_F\leq0$ has nonincreasing slopes, but
+must begin with some positive slope $a_i$. Inside that piece,
+\[
+ \mathcal LV=V'+V''=a_i>0,
+\]
+contradicting the generator condition. Kinks alone cannot repair the drift.
+The quadratic $V(x)=2x-x^2$ does:
+$\mathcal LV=(2-2x)-2=-2x\leq0$.
+
+\begin{center}
+\includegraphics[width=.86\linewidth]{../log/figures/motivating_counterexample.pdf}
+\end{center}
 \end{infobox}
 
-\coreideabox
-\end{minipage}\hfill
-% --------------------------------------------------------
-\begin{minipage}[t]{0.235\textwidth}
-\postersection{4. Pairwise-interface bottleneck}
-Only adjacent full-dimensional regions sharing a facet contribute local time,
-but discovering $N$ neural regions may already be exponential in depth and a
-na\"ive pairwise search costs $O(N^2)$. The baseline verifier constructs the
-actual adjacency graph, but the long-term goal is to avoid the facet check.
+\postersubsection{2.2 Representational power}
+Complex SDEs can require many quadratic regions. Deep neural networks can
+represent these regions compactly and discover their partition during
+training. Piecewise quadratics also have strong approximation power: under
+strict margins, a smooth 2D certificate can be approximated by valid $C^1$
+piecewise-quadratic splines. Following existing committor-function literature,
+which uses deep neural networks to train committors~[3,4], we use deep networks
+to learn certificate-like functions.
 
-\postersubsection{Guarantee the sign by construction}
-Split regular and singular curvature:
+\postersubsection{2.3 Local-time safety by construction}
+Checking the local-time condition creates a verification bottleneck. If the
+network induces $N$ full-dimensional regions, naively testing all pairs costs
+$O(N^2)$, even though only adjacent regions sharing a facet can contribute
+local time. Explicit adjacency discovery is already expensive as depth and
+width increase.
+
+To guarantee the sign without discovering every facet, we propose the
+\textbf{Deep Residual ICNN} architecture
 \[
-\boxed{\qquad V_\theta(x)=S_\theta(x)-C_\psi(x).\qquad}
+ \boxed{\quad V_\theta(x)=\rho\bigl(S_\theta(x)-C_\psi(x)\bigr),
+ \qquad \rho>0.\quad}
 \]
-$S_\theta$ is $C^1$ and piecewise quadratic, for example
+The $C^1$ piecewise-quadratic branch may be
 \[
-S_\theta(x)=c+p^\top x+\tfrac12x^\top Hx
-+\tfrac12\sum_kv_k\operatorname{ReLU}(a_k^\top x+b_k)^2,
+ S_\theta(x)=c+p^\top x+\tfrac12x^\top Hx
+ +\tfrac12\sum_kv_k\operatorname{ReLU}(a_k^\top x+b_k)^2.
 \]
-while $C_\psi$ is convex and piecewise affine: either a ReLU input-convex neural
-network or $\max_r(a_r^\top x+b_r)$.
-
-\begin{bluebox}
-The $C^1$ branch has no singular surface curvature. Convexity gives
-\[
-D^2_{\mathrm{sing}}V_\theta
-=-D^2_{\mathrm{sing}}C_\psi\preceq0,
-\]
-so every local-time jump has the required sign \emph{without} discovering the
-facet adjacency graph. Value bounds and the interior generator still require
-verification.
-\end{bluebox}
-
-\postersubsection{Expressivity trade-off}
-The construction controls only the nonsmooth curvature: $S_\theta$ may retain
-indefinite ordinary curvature. However, global convexity of $C_\psi$ is stronger
-than constraints only on reachable facets, and its CPWL gradient jumps are
-piecewise constant rather than affine along a general PWQ facet.
-
-\postersection{5. Current contribution}
-\begin{itemize}
-\item Exact multidimensional neural-cell discovery with PWQ coefficients.
-\item A sound geometric 2D verifier for values, generator, continuity, and local-time jumps.
-\item Residual ICNN and max-affine architectures with the jump sign built in.
-\item A structural verifier that omits facet enumeration for these architectures.
-\item A successfully trained and exactly verified construction-safe certificate, shown below.
-\end{itemize}
-
-\textcolor{Muted}{\fontsize{8.2}{9.3}\selectfont Exact verification currently
-targets 2D SDEs on hyperrectangular domains; scaling beyond explicit cell
-enumeration remains ongoing work.}
-\end{minipage}\hfill
-% --------------------------------------------------------
-\begin{minipage}[t]{0.235\textwidth}
-\postersection{6. Training a certificate}
-\postersubsection{Controlled 2D OU benchmark}
-The experiment uses
-$dX_t=-X_t\,dt+0.5\,dW_t$ on $K=[-2,2]^2$.
-
-\centering
-\includegraphics[width=\linewidth]{figures/verified_radial_ou_certificate.png}\par
-\raggedright
-{\fontsize{7.2}{8.2}\selectfont\color{Muted}
-The four panels show: (1) marked reach--avoid sets and 30 stopped state
-trajectories; (2) the learned surface; (3) piecewise boundaries and 21 verified
-cells; and (4) the stopped processes $V(X_{t\wedge\tau})$. Simulations are
-diagnostic only.\par}
-
-\begin{bluebox}
-\statusdot{Good}\hspace{1mm}\textbf{Exactly verified.}
-The trained certificate has \textbf{21 PWQ cells}; all \textbf{4 max-affine
-pieces} are active, and the local-time condition holds by construction. With
-$\alpha=0.8$ and $\beta=2$, the certified failure-probability bound is
-$\alpha/\beta=0.4$.
-\end{bluebox}
-
-\postersubsection{Training recipe}
-\tinylabel{ADAM, LR $2\times10^{-3}$, BATCH 256, SEED 2026}
-{\fontsize{7.8}{8.9}\selectfont
+The convex piecewise-affine branch is a deep ReLU ICNN~[2]:
 \begin{align*}
-\ell_0&=\max_{X_0}[V-(\alpha-m)]_+,\\
-\ell_u&=\max_{X_u}[(\beta+m)-V]_+,\\
-\ell_{\partial K}&=\max_{\partial K\setminus X_T}[(\beta+m)-V]_+,\\
-\ell_+&=\max_K[-V]_+,\\[-1mm]
-\ell_{\mathcal L}&=\max_{K\setminus X_T}\min\{
-[\mathcal LV+\varepsilon+m_{\mathcal L}]_+,[(\beta+m)-V]_+\}.
+ z_1&=\operatorname{ReLU}(U_1x+b_1),\\[-1mm]
+ z_\ell&=\operatorname{ReLU}(U_\ell x+b_\ell+W_\ell z_{\ell-1}),\\[-1mm]
+ C_\psi(x)&=u^\top x+c+w^\top z_L,
+ \qquad W_\ell,w\geq0.
 \end{align*}
-$\ell=80(\ell_0+\ell_u+\ell_{\partial K}+\ell_{\mathcal L})+20\ell_+$ plus
-regularisation. Verifier counterexamples are added every 25 epochs; checkpoint
-200 verifies exactly. No concavity loss is needed.}
+Nonnegative hidden-to-hidden and output weights make $C_\psi$ convex; ReLU
+makes it continuous and piecewise affine. Softplus parameterization enforces
+the weight constraints during unconstrained training.
+
+\begin{theorembox}
+\textbf{Theorem (local-time condition by construction).}
+For every pair of adjacent cells and every parameter choice,
+\[
+ \bigl(\nabla V_{\theta,j}-\nabla V_{\theta,i}\bigr)^\top
+ n_{i\to j,F}\leq0.
+\]
+Therefore all codimension-one local-time contributions are nonpositive; no
+activation-region enumeration is required to establish their sign.
+\end{theorembox}
+
+\end{minipage}\hfill
+% --------------------------------------------------------
+\begin{minipage}[t]{.322\textwidth}
+
+\textbf{Proof sketch for §2.3.} Restrict convex $C_\psi$ to a line normal to
+$F$. The derivative of a one-dimensional convex function is nondecreasing, so
+\[
+ (\nabla C_{\psi,j}-\nabla C_{\psi,i})^\top n_{i\to j,F}\geq0.
+\]
+Because $S_\theta\in C^1$, its gradient jump is zero. Consequently
+\begin{align*}
+ (\nabla V_{\theta,j}-\nabla V_{\theta,i})^\top n
+ &=-\rho(\nabla C_{\psi,j}-\nabla C_{\psi,i})^\top n\\[-1mm]
+ &\leq0.\qquad\square
+\end{align*}
+This controls only interface curvature. Nonnegativity, set separation, the
+interior generator inequality, and integrability must still be verified.
+
+\postersection{3. Experiments and failure modes}
+At first, we tried to train a plain ReLU MLP with a piecewise-quadratic output
+layer and found that it was very difficult to train.
+
+After proposing the Deep Residual ICNN architecture, training became easier
+and we found valid certificates for a simple SDE with loose bounds.
+\begin{center}
+\includegraphics[width=\linewidth]{verifier-guided-poisson-teacher.png}
+\end{center}
+{\fontsize{7.4}{8.4}\selectfont\color{Muted}
+\textbf{Figure 3.} A verifier-guided Poisson-teacher fit: the teacher,
+verified certificate, approximation error, and verified generator.\par}
+
+\postersection{Limitations and future work}
+\begin{enumerate}
+\item We could not train a valid certificate using Adam alone; success
+required linear programming on the $S_{\theta_1}$ branch.
+\item The ICNN branch $C_{\theta_2}$ was almost zero and contributed little to
+the final certificate.
+\end{enumerate}
+
+\textbf{We found a connection to a large body of literature on committor
+functions, which offers efficient methods for training certificate-like
+functions~[3,4]. Its sampling methods improved our training with Adam,
+although they have not yet produced a verified certificate.}
+
+These results remain limited to simplified settings. The main open challenge
+is to make both branches train effectively while retaining exact verification.
+
+\postersection{Preliminaries and notation}
+\textbf{Martingales.} On a filtered probability space
+$(\Omega,\mathcal F,(\mathcal F_t)_{t\geq0},\mathbb P)$, an adapted integrable
+process $Y_t$ is a supermartingale when
+\[
+ \mathbb E[Y_t\mid\mathcal F_s]\leq Y_s,\qquad s\leq t.
+\]
+It is a martingale when equality holds.
+
+\textbf{Generator.} For the SDE above,
+\[
+ \mathcal LV=\nabla V^\top f+
+ \tfrac12\operatorname{tr}(\sigma\sigma^\top\nabla^2V).
+\]
+The first term is the Lie derivative along the deterministic drift; the
+second records curvature sampled by the diffusion.
+
+\textbf{Local time.} $L_t^F$ measures the infinitesimal time accumulated by
+$X_t$ at a kink facet $F$. Its contribution is weighted by the signed
+normal-gradient jump $\gamma_F$.
+
+% \textbf{Input-convex neural network.} An ICNN is convex in its input because
+% its recurrent and output weights are nonnegative and its activations are
+% convex and nondecreasing. We subtract this convex branch so its gradient jumps
+% have the supermartingale sign.
+
+\postersection{Python package}
+We propose a Python package, \texttt{tanaka\_certificates}, with utilities for
+verifying Tanaka certificates and a thorough test suite. Example usage:
+
+\begin{lstlisting}[style=posterpython,
+  caption={Verify a piecewise-quadratic certificate.},captionpos=b]
+# pip install tanaka-certificates
+
+sde, problem = make_piecewise_quadratic_ou_2d_problem()
+verifier = VerifierPiecewiseQuadratic(
+    sde, problem, _ou_example_certificate())
+
+assert verifier.verify() is VerificationResult.NOT_VERIFIED
+issue = next(i for i in verifier.issues
+    if i.kind is IssueKind.DOMAIN_BOUNDARY)
+assert issue.value < problem.beta
+\end{lstlisting}
 \end{minipage}
 
 \vspace{1.5mm}
-\textcolor{Rule}{\rule{\linewidth}{0.6pt}}\par
+\textcolor{Rule}{\rule{\linewidth}{0.7pt}}\par
 {\fontsize{7.3}{8.2}\selectfont\color{Muted}
-[1] G. Neustroev et al., ``Neural Continuous-Time Supermartingale Certificates,'' AAAI 2025.
-\hfill Contact: filip.morawiec@gmail.com\quad $\cdot$ \quad
-Middle-of-programme result; broader architectural comparisons remain in progress.}
+[1] G. Neustroev et al., ``Neural Continuous-Time Supermartingale
+Certificates,'' \emph{AAAI}, 2025, doi:10.1609/aaai.v39i26.34966.
+\quad [2] B. Amos, L. Xu, and J. Z. Kolter, ``Input Convex Neural Networks,''
+arXiv:1609.07152, 2017.
+\quad [3] Y. Khoo, J. Lu, and L. Ying, ``Solving for high dimensional
+committor functions using artificial neural networks,'' arXiv:1802.10275.
+\quad [4] Y. Wang et al., ``Estimating Committor Functions via Deep Adaptive
+Sampling on Rare Transition Paths,'' arXiv:2501.15522.
+\hfill Contact: filip.morawiec@gmail.com}
+
 \end{minipage}
 \end{adjustbox}
 \end{document}
