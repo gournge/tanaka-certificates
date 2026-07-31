@@ -1267,7 +1267,6 @@ dependencies = [
     { name = "matplotlib" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "pytest-cov" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "torch" },
@@ -1276,6 +1275,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
+    { name = "pytest-cov" },
 ]
 
 [package.metadata]
@@ -1283,13 +1283,15 @@ requires-dist = [
     { name = "auto-lirpa", git = "https://github.com/Verified-Intelligence/auto_LiRPA.git" },
     { name = "matplotlib", specifier = ">=3.10" },
     { name = "numpy", specifier = ">=2.0" },
-    { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "scipy", specifier = ">=1.17.1" },
     { name = "torch", specifier = ">=2.11,<2.12" },
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0" }]
+dev = [
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-cov", specifier = ">=7.1.0" },
+]
 
 [[package]]
 name = "tomli"

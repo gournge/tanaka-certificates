@@ -1,97 +1,130 @@
-# Tanaka certificates
+# Itô–Tanaka certificates
 
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.14-blue?style=flat-square)
 ![uv](https://img.shields.io/badge/managed%20with-uv-2b0231?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-pytest-informational?style=flat-square)
+[![Tests](https://github.com/gournge/tanaka-certificates/actions/workflows/tests.yml/badge.svg)](https://github.com/gournge/tanaka-certificates/actions/workflows/tests.yml)
 [![Coverage](https://img.shields.io/codecov/c/github/gournge/tanaka-certificates?style=flat-square)](https://codecov.io/gh/gournge/tanaka-certificates)
 
-This repository explores extending the framework of Neural Continuous-Time Supermartingale Certificates [1] to the case of *piecewise* twice continously-differentiable certificates, rather than twice continously-differentiable certificates. This requires using the Itô-Tanaka-Meyer formula, which accounts for *kinks* and the infinitesimal time spent at these kinks.
+This repository explores extending the framework of Neural Continuous-Time Supermartingale Certificates [1] to the case of piecewise twice continously-differentiable certificates, rather than twice continously-differentiable certificates. This requires using the Itô-Tanaka-Meyer formula, which accounts for kinks and the infinitesimal time spent at these kinks.
 
 It is supervised by Grigory Neustroev, and is a part of Filip Morawiec's 2026 Summer Research Programme at the University of Birmingham in the topic of AI Safety, within the lab of Prof. Mirco Giacobbe.
 
-You can find the research log and weekly reports in the [`docs/research/pdf/`](docs/research/pdf/) directory.
 
-Development documentation can be accessed through the [`docs/dev/index.md`](docs/dev/index.md) file.
+## Results
 
-## Project structure
+<!-- plot it with centering as a medium size (it's a square) -->
+<!-- docs/research/poster/verifier-guided-poisson-teacher.png -->
+<div style="text-align:center">
+  <img src="docs/research/poster/verifier-guided-poisson-teacher.png" width="400px" />
+</div>
 
-```
-.
-├── .github/
-│   └── workflows/             # GitHub Actions configuration
-├── docs/
-│   ├── dev/                    # Development notes and verifier documentation
-│   │   ├── img/                # Images used by development docs
-│   │   └── verifier_pwq_2d/    # Piecewise-quadratic verifier notes
-│   └── research/
-│       ├── log/                # Research-log TeX sources
-│       │   ├── figures/        # Figures used by the research log
-│       │   └── sections/       # Research-log section TeX files
-│       ├── pdf/                # Rendered research log and weekly reports
-│       └── weekly-reports/     # Weekly-report TeX sources and images
-├── output/                     # Generated experiment artifacts
-├── scripts/
-│   ├── research/               # Research-log plot generation scripts
-│   └── plot_*.py               # Plotting and visualization scripts
-├── tanaka_certificates/
-│   ├── nn/                     # Neural-certificate training utilities
-│   ├── sde/                    # Stochastic differential equation models
-│   ├── verifier/               # Multidimensional PWQ certificate verifiers
-│   ├── artifacts.py            # Experiment artifact path helpers
-│   ├── cell_discovery.py       # Cell discovery for piecewise networks
-│   ├── certificate.py          # Certificate abstractions
-│   ├── generator_supremum.py   # Generator supremum optimization helpers
-│   ├── problems.py             # Problem definitions
-│   ├── ra.py                   # Reach-avoid specification helpers
-│   └── regions.py              # Region and geometry utilities
-├── tests/
-│   ├── nn/                     # Neural-certificate tests
-│   ├── verifier/               # Verifier tests
-│   └── test_*.py               # Unit and integration tests
-├── .gitignore
-├── pyproject.toml
-└── uv.lock
-```
+The main experiment fits a piecewise-quadratic certificate for a
+two-dimensional Ornstein–Uhlenbeck reach–avoid problem, as shown above. 
+That problem's setup is $\alpha=1.97$, $\beta=2$, and $\epsilon=0.1$, so it gives a 
+pretty loose (but valid) bound:
 
-## Development
+$
+\mathbb P(\text{unsafe set or domain exit before target}) \leq 0.985.
+$
 
-Install the Python environment and run the test suite with
-[uv](https://docs.astral.sh/uv/):
+The repository also contains:
+
+- a multidimensional Itô–Tanaka certificate theorem;
+- piecewise-quadratic cell discovery and verification;
+- a residual ICNN architecture whose local-time sign is safe by construction;
+- training experiments, counterexamples, research notes, and tests.
+
+> **Note:** Although I used AI tools for programming, I wrote the key tests and went 
+> through the math and code myself.
+
+
+## Project links
+
+- [Project overview and write-up](https://filipmorawiec.com/tanaka)
+- [A0 poster](docs/research/poster/poster.pdf)
+- [Research log](docs/research/pdf/research-log.pdf)
+- [Latest weekly report](docs/research/pdf/weekly-reports/2026-07-20.pdf)
+- [All rendered research documents](docs/research/pdf/README.md)
+- [Development notes](docs/dev/index.md)
+
+## Quick start
+
+Install [uv](https://docs.astral.sh/uv/), clone the repository, and create the
+locked development environment:
 
 ```bash
+git clone https://github.com/gournge/tanaka-certificates.git
+cd tanaka-certificates
 uv sync --dev
+```
+
+Run the test suite:
+
+```bash
 uv run pytest
 ```
 
-Plotting and experiment scripts write results to named directories under
-`output/`, including the timestamp and Git revision.
+## Reproduce the poster experiment
 
-### Compiling TeX files
+Run the verifier-guided Poisson-teacher experiment with its default fixed
+configuration:
 
-Install a TeX distribution that includes `latexmk` and `listings`. On Debian
-or Ubuntu, these are provided by:
+```bash
+uv run python scripts/train_icnn_poisson_teacher.py --method verifier-lp
+```
+
+The command fits the certificate, verifies it, and writes a checkpoint,
+diagnostic figure, and `verification.log` to a revision-stamped directory under
+`output/`. The log records the verification status, number of cells, certificate
+parameters, and numerical diagnostics.
+
+Other useful entry points include:
+
+```bash
+# Controlled construction-safe OU benchmark
+uv run python scripts/train_verified_radial_ou_certificate.py
+
+# Ideal martingale/trajectory illustration used in the poster
+uv run python scripts/plot_intro_martingale_committor.py
+```
+
+## Repository guide
+
+- `tanaka_certificates/verifier/` — exact regional and numerical PWQ verifiers;
+- `tanaka_certificates/cell_discovery.py` — conservative activation-cell discovery;
+- `tanaka_certificates/nn/` — certificate architectures and training utilities;
+- `scripts/` — reproducible experiments and plotting entry points;
+- `tests/` — unit, integration, and verifier regression tests;
+- `docs/research/` — poster, research log, and weekly reports;
+- `docs/dev/` — implementation and verifier notes.
+
+Experiment scripts write their outputs to ignored, revision-stamped directories
+under `output/`.
+
+## Compiling the research documents
+
+Install a TeX distribution containing `latexmk` and `listings`. On Debian or
+Ubuntu:
 
 ```bash
 sudo apt install latexmk texlive-latex-recommended
 ```
 
-Compile the research log, poster, and every weekly report from the repository
-root with the shared script:
+Compile the poster, research log, and weekly reports from the repository root:
 
 ```bash
 ./scripts/compile_latex.sh
 ```
 
-To compile only selected document groups, pass one or more of `log`, `poster`,
-or `weekly`, for example:
+To compile selected groups only, pass `log`, `poster`, or `weekly`:
 
 ```bash
 ./scripts/compile_latex.sh log poster
 ```
 
-The research log and weekly reports are written under `docs/research/pdf/`;
-the poster is written to `docs/research/poster/poster.pdf`.
+## Reference
 
-## References
-
-[1] - Neustroev, Grigory, et al. “Neural Continuous-Time Supermartingale Certificates.” Proceedings of the AAAI Conference on Artificial Intelligence, edited by , vol. 39, no. 26, Apr. 2025, pp. 27538–46. Crossref, https://doi.org/10.1609/aaai.v39i26.34966.
+G. Neustroev et al., “Neural Continuous-Time Supermartingale Certificates,”
+*Proceedings of the AAAI Conference on Artificial Intelligence*, vol. 39,
+no. 26, pp. 27538–27546, 2025.
+[doi:10.1609/aaai.v39i26.34966](https://doi.org/10.1609/aaai.v39i26.34966)
