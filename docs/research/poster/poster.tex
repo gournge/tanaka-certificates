@@ -191,7 +191,7 @@ representational power, and local-time safety by construction through our
 but so far only in very simplified settings. We identify useful techniques
 and several failure modes.
 
-\postersection{1. Validity of non-$C^2$ certificates}
+\postersection{RQ1: Validity of non-$C^2$ certificates}
 Let $V$ be continuous and $C^2$ on each polyhedral cell $K_i$. Across a shared
 facet $F$, we have a normal vector $n_{i\to j,F} \in \mathbb{R}^d$ from $K_i$ to $K_j$. 
 Define the normal-gradient jump to be
@@ -232,7 +232,7 @@ the martingale increment has conditional mean zero. Hence
 % --------------------------------------------------------
 \begin{minipage}[t]{.322\textwidth}
 \vspace{0pt}
-\postersection{2. A useful class of non-$C^2$ certificates}
+\postersection{RQ2: A useful class of non-$C^2$ certificates}
 \postersubsection{2.1 Piecewise-quadratic structure}
 We propose that $V$ has this form:
 \[
@@ -330,7 +330,7 @@ Because $S_\theta\in C^1$, its gradient jump is zero. Consequently
 % This controls only interface curvature. Nonnegativity, set separation, the
 % interior generator inequality, and integrability must still be verified.
 
-\postersection{3. Experiments and failure modes}
+\postersection{RQ3: Experiments and failure modes}
 At first, we tried to train a plain ReLU MLP with a piecewise-quadratic output
 layer and found it was difficult to train.
 
@@ -374,7 +374,7 @@ by training multiple certificates and gluing them together.
 These results remain limited to simplified settings. The main open challenge
 is to make both branches train effectively while retaining exact verification.
 
-\postersection{Preliminaries and notation}
+\postersection{Mathematical background}
 \textbf{Martingales.} On a filtered probability space
 $(\Omega,\mathcal F,(\mathcal F_t)_{t\geq0},\mathbb P)$, an adapted integrable
 process $Y_t$ is a supermartingale when
@@ -433,14 +433,14 @@ assert verification.value == "verified"
 
 \vspace{1.1mm}
 \begin{center}
-\begin{minipage}[c]{.18\linewidth}
+\begin{minipage}[c]{.30\linewidth}
   \centering
   \href{https://filipmorawiec.com/tanaka}{%
-    \includegraphics[width=15mm]{figures/tanaka-qr.png}}
+    \includegraphics[width=25mm]{figures/tanaka-qr.png}}
 \end{minipage}\hspace{2mm}%
-\begin{minipage}[c]{.66\linewidth}
+\begin{minipage}[c]{.54\linewidth}
   {\fontsize{9.2}{10.4}\selectfont\bfseries
-   Blogpost and Github repository}\par
+   Blogpost\\ and Github repository}\par
   \vspace{.5mm}
   {\fontsize{8.1}{9.2}\selectfont\color{AccentDark}
    \href{https://filipmorawiec.com/tanaka}{filipmorawiec.com/tanaka}}
