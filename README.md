@@ -23,9 +23,7 @@ two-dimensional Ornstein–Uhlenbeck reach–avoid problem, as shown above.
 That problem's setup is $\alpha=1.97$, $\beta=2$, and $\epsilon=0.1$, so it gives a 
 pretty loose (but valid) bound:
 
-$
-\mathbb P(\text{unsafe set or domain exit before target}) \leq 0.985.
-$
+$\mathbb P(\text{unsafe set or domain exit before target}) \leq 0.985.$
 
 The repository also contains:
 
