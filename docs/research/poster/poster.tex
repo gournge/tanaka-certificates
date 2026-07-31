@@ -1,4 +1,10 @@
 % !TEX program = pdflatex
+% Lay the poster out on an A3 design grid, then magnify the complete page to
+% A0.  Scaling the whole page keeps fonts, spacing, rules, and box padding in
+% proportion; changing only geometry's paper size would leave 9 pt body text
+% on an A0 sheet.  2.831 is the uniform scale from the rounded ISO A3
+% dimensions (297 x 420 mm) to A0 (841 x 1189 mm).
+\mag=2831
 \documentclass[10pt]{article}
 \usepackage[a3paper,portrait,left=8mm,right=8mm,top=8mm,bottom=8mm]{geometry}
 \usepackage[T1]{fontenc}
