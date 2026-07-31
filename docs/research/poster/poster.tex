@@ -411,9 +411,6 @@ verifying Tanaka certificates and a thorough test suite. Example usage:
 
 \begin{lstlisting}[style=posterpython,
   caption={Verify a piecewise-quadratic certificate.},captionpos=b]
-# pip install tanaka-certificates
-from tanaka_certificates import *
-
 sde, problem = make_enlarged_target_ou_problem()
 model, _ = train_fixed_pwq_lp() # only for that problem for now
 model.eval()
