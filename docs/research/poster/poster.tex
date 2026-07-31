@@ -167,7 +167,7 @@ stopped martingale $V(X_{t\wedge\tau})$. It's numerically estimated to be a mart
 \vspace{1mm}
 \textcolor{Rule}{\rule{\linewidth}{0.7pt}}\par
 \vspace{.7mm}
-{Following the motivations given above, these research
+{Following the motivations, these
 questions arise:}\par
 \vspace{.7mm}
 
@@ -198,11 +198,8 @@ The multidimensional It\^o--Tanaka formula gives
  &+\frac12\sum_F\int_0^{t\wedge\tau}\gamma_F(X_s)\,dL_s^F,
 \end{align*}
 where
-\[
- \mathcal LV=\nabla V^\top f+\tfrac12
- \operatorname{tr}(\sigma\sigma^\top\nabla^2V),
-\]
-and $L^F$ is nondecreasing surface local time.
+$ \mathcal LV=\nabla V^\top f+\tfrac12
+ \operatorname{tr}(\sigma\sigma^\top\nabla^2V)$ and $L^F$ is nondecreasing surface local time.
 
 \begin{theorembox}
 \textbf{Theorem (It\^o--Tanaka certificate).}
@@ -239,7 +236,7 @@ network partitions $K$ into polyhedral cells and, after refinement by $\phi$,
 \[
  V_i(x)=c_i+p_i^\top x+\tfrac12x^\top Q_i x.
 \]
-Thus $\nabla V_i=p_i+Q_ix$ and $\nabla^2V_i=Q_i$, which we apply when checking the
+Thus $\nabla V_i=p_i+Q_ix$ and $\nabla^2V_i=Q_i$, which we use when checking the
 generator and local-time conditions. 
 \begin{infobox}
 \textbf{Why is plain ReLU insufficient?} For
@@ -265,16 +262,14 @@ training. Piecewise quadratics also have strong approximation power: under
 strict margins, a smooth 2D certificate can be approximated by valid $C^1$
 piecewise-quadratic splines. Following existing committor-function literature,
 which uses deep neural networks to train committors~[3,4], we use deep networks
-to learn certificate-like functions.
+to learn certificates.
 
 \postersubsection{2.3 Local-time safety by construction}
 Checking the local-time condition creates a verification bottleneck. If the
-network induces $N$ full-dimensional regions, naively testing all pairs costs
-$O(N^2)$, even though only adjacent regions sharing a facet can contribute
-local time. Explicit adjacency discovery is already expensive as depth and
-width increase.
+network induces $N$ full-dimensional regions, naively testing all pairs is of order
+$O(N^2)$.
 
-To guarantee the sign without discovering every facet, we propose the
+To avoid manually checking the local-time condition, we propose the
 \textbf{Deep Residual ICNN} architecture
 \[
  \boxed{\quad V_\theta(x)=\rho\bigl(S_\theta(x)-C_\psi(x)\bigr),
@@ -285,16 +280,16 @@ The $C^1$ piecewise-quadratic branch may be
  S_\theta(x)=c+p^\top x+\tfrac12x^\top Hx
  +\tfrac12\sum_kv_k\operatorname{ReLU}(a_k^\top x+b_k)^2.
 \]
-The convex piecewise-affine branch is a deep ReLU ICNN~[2]:
-\begin{align*}
- z_1&=\operatorname{ReLU}(U_1x+b_1),\\[-1mm]
- z_\ell&=\operatorname{ReLU}(U_\ell x+b_\ell+W_\ell z_{\ell-1}),\\[-1mm]
- C_\psi(x)&=u^\top x+c+w^\top z_L,
- \qquad W_\ell,w\geq0.
-\end{align*}
-Nonnegative hidden-to-hidden and output weights make $C_\psi$ convex; ReLU
-makes it continuous and piecewise affine. Softplus parameterization enforces
-the weight constraints during unconstrained training.
+The convex piecewise-affine branch is a ReLU Input Convex Neural Network (ICNN)~[2].
+% \begin{align*}
+%  z_1&=\operatorname{ReLU}(U_1x+b_1),\\[-1mm]
+%  z_\ell&=\operatorname{ReLU}(U_\ell x+b_\ell+W_\ell z_{\ell-1}),\\[-1mm]
+%  C_\psi(x)&=u^\top x+c+w^\top z_L,
+%  \qquad W_\ell,w\geq0.
+% \end{align*}
+% Nonnegative hidden-to-hidden and output weights make $C_\psi$ convex; ReLU
+% makes it continuous and piecewise affine. Softplus parameterization enforces
+% the weight constraints during unconstrained training.
 
 \begin{theorembox}
 \textbf{Theorem (local-time condition by construction).}
@@ -303,34 +298,44 @@ For every pair of adjacent cells and every parameter choice,
  \bigl(\nabla V_{\theta,j}-\nabla V_{\theta,i}\bigr)^\top
  n_{i\to j,F}\leq0.
 \]
-Therefore all codimension-one local-time contributions are nonpositive; no
-activation-region enumeration is required to establish their sign.
+Therefore the local-time condition is satisfied. 
+% all codimension-one local-time contributions are nonpositive; no
+% activation-region enumeration is required to establish their sign.
 \end{theorembox}
 
-\end{minipage}\hfill
-% --------------------------------------------------------
-\begin{minipage}[t]{.322\textwidth}
-
-\textbf{Proof sketch for §2.3.} Restrict convex $C_\psi$ to a line normal to
+\textbf{Proof sketch.} Restrict convex $C_\psi$ to a line normal to
 $F$. The derivative of a one-dimensional convex function is nondecreasing, so
 \[
  (\nabla C_{\psi,j}-\nabla C_{\psi,i})^\top n_{i\to j,F}\geq0.
 \]
 Because $S_\theta\in C^1$, its gradient jump is zero. Consequently
-\begin{align*}
+\begin{equation*}
  (\nabla V_{\theta,j}-\nabla V_{\theta,i})^\top n
- &=-\rho(\nabla C_{\psi,j}-\nabla C_{\psi,i})^\top n\\[-1mm]
- &\leq0.\qquad\square
-\end{align*}
-This controls only interface curvature. Nonnegativity, set separation, the
-interior generator inequality, and integrability must still be verified.
+ =-\rho(\nabla C_{\psi,j}-\nabla C_{\psi,i})^\top n
+ \leq0.\qquad\square
+\end{equation*}
+% \begin{align*}
+%  (\nabla V_{\theta,j}-\nabla V_{\theta,i})^\top n
+%  &=-\rho(\nabla C_{\psi,j}-\nabla C_{\psi,i})^\top n\\[-1mm]
+%  &\leq0.\qquad\square
+% \end{align*}
+% This controls only interface curvature. Nonnegativity, set separation, the
+% interior generator inequality, and integrability must still be verified.
 
 \postersection{3. Experiments and failure modes}
 At first, we tried to train a plain ReLU MLP with a piecewise-quadratic output
-layer and found that it was very difficult to train.
+layer and found it was difficult to train.
 
 After proposing the Deep Residual ICNN architecture, training became easier
 and we found valid certificates for a simple SDE with loose bounds.
+
+\end{minipage}\hfill
+% --------------------------------------------------------
+\begin{minipage}[t]{.322\textwidth}
+
+\textbf{Training.} We trained it by first numerically approximating a martingale with 
+$\mathcal L V = - \epsilon$, \textit{disabling the ICNN branch} and then fitting $S_\theta$ with linear programming.
+
 \begin{center}
 \includegraphics[width=\linewidth]{verifier-guided-poisson-teacher.png}
 \end{center}
@@ -342,14 +347,18 @@ verified certificate, approximation error, and verified generator.\par}
 \begin{enumerate}
 \item We could not train a valid certificate using Adam alone; success
 required linear programming on the $S_{\theta_1}$ branch.
-\item The ICNN branch $C_{\theta_2}$ was almost zero and contributed little to
-the final certificate.
+\item The ICNN branch $C_{\theta_2}$ was set to zero in the verified certificate shown above. 
+Nonetheless, it conveyed useful geometry during empirical experiments.
+\item \textbf{We found a connection to a large body of literature on committor
+functions, which offers efficient methods for training certificate-like
+functions}~[3,4]. Its sampling methods improved our training with Adam,
+although they have not yet produced a verified certificate.
+\item Although not explored here, a valuable research direction would explore
+\textbf{compositionality}, which could potentially allow for richer specification 
+descriptions (e.g. LTL)~[5] and efficient training via a divide-and-conquer-like manner 
+by training multiple certificates and gluing them together.  
 \end{enumerate}
 
-\textbf{We found a connection to a large body of literature on committor
-functions, which offers efficient methods for training certificate-like
-functions~[3,4]. Its sampling methods improved our training with Adam,
-although they have not yet produced a verified certificate.}
 
 These results remain limited to simplified settings. The main open challenge
 is to make both branches train effectively while retaining exact verification.
@@ -363,17 +372,30 @@ process $Y_t$ is a supermartingale when
 \]
 It is a martingale when equality holds.
 
-\textbf{Generator.} For the SDE above,
-\[
- \mathcal LV=\nabla V^\top f+
- \tfrac12\operatorname{tr}(\sigma\sigma^\top\nabla^2V).
-\]
-The first term is the Lie derivative along the deterministic drift; the
-second records curvature sampled by the diffusion.
+% \textbf{Generator.} For the SDE above,
+% \[
+%  \mathcal LV=\nabla V^\top f+
+%  \tfrac12\operatorname{tr}(\sigma\sigma^\top\nabla^2V).
+% \]
+% The first term is the Lie derivative along the deterministic drift; the
+% second records curvature sampled by the diffusion.
 
-\textbf{Local time.} $L_t^F$ measures the infinitesimal time accumulated by
-$X_t$ at a kink facet $F$. Its contribution is weighted by the signed
-normal-gradient jump $\gamma_F$.
+% \textbf{Local time.} $L_t^F$ measures the infinitesimal time accumulated by
+% $X_t$ at a kink facet $F$. Its contribution is weighted by the signed
+% normal-gradient jump $\gamma_F$.
+
+\textbf{Local time.} Let $F=\{x:h_F(x)=0\}$ locally, where $h_F$ is the
+signed distance to the facet, positive in the direction $n_{i\to j,F}$.
+The surface local time of $X$ on $F$ is the symmetric semimartingale local
+time
+\[
+ L_t^F:=L_t^0\!\bigl(h_F(X)\bigr)
+ =\lim_{\varepsilon\downarrow0}\frac{1}{2\varepsilon}
+ \int_0^t\mathbf 1_{\{|h_F(X_s)|<\varepsilon\}}\,
+ d\langle h_F(X)\rangle_s,
+\]
+whenever the limit exists. It is nondecreasing and increases only when
+$X_t\in F$.
 
 % \textbf{Input-convex neural network.} An ICNN is convex in its input because
 % its recurrent and output weights are nonnegative and its activations are
@@ -386,16 +408,15 @@ verifying Tanaka certificates and a thorough test suite. Example usage:
 
 \begin{lstlisting}[style=posterpython,
   caption={Verify a piecewise-quadratic certificate.},captionpos=b]
-# pip install tanaka-certificates
+  # pip install tanaka-certificates
+  from tanaka_certificates import *
 
-sde, problem = make_piecewise_quadratic_ou_2d_problem()
-verifier = VerifierPiecewiseQuadratic(
-    sde, problem, _ou_example_certificate())
-
-assert verifier.verify() is VerificationResult.NOT_VERIFIED
-issue = next(i for i in verifier.issues
-    if i.kind is IssueKind.DOMAIN_BOUNDARY)
-assert issue.value < problem.beta
+  sde, problem = make_enlarged_target_ou_problem()
+  model, _ = train_fixed_pwq_lp() 
+  model.eval()
+  verifier = VerifierLocalTimeByConstruction(sde, problem, model)
+  verification = verifier.verify()
+  assert verification.value == "verified"
 \end{lstlisting}
 \end{minipage}
 
@@ -410,6 +431,17 @@ arXiv:1609.07152, 2017.
 committor functions using artificial neural networks,'' arXiv:1802.10275.
 \quad [4] Y. Wang et al., ``Estimating Committor Functions via Deep Adaptive
 Sampling on Rare Transition Paths,'' arXiv:2501.15522.
+\quad [5] A. Abate, M. Giacobbe, and D. Roy, ``Quantitative Supermartingale Certificates,'' arXiv:2504.05065.
+% @misc{abate2025quantitativesupermartingalecertificates,
+%       title={Quantitative Supermartingale Certificates}, 
+%       author={Alessandro Abate and Mirco Giacobbe and Diptarko Roy},
+%       year={2025},
+%       eprint={2504.05065},
+%       archivePrefix={arXiv},
+%       primaryClass={cs.LO},
+%       url={https://arxiv.org/abs/2504.05065}, 
+% }
+
 \hfill Contact: filip.morawiec@gmail.com}
 
 \end{minipage}
