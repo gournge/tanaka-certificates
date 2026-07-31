@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.14-blue?style=flat-square)
 ![uv](https://img.shields.io/badge/managed%20with-uv-2b0231?style=flat-square)
 ![Tests](https://img.shields.io/badge/tests-pytest-informational?style=flat-square)
-<!-- ![Coverage](https://img.shields.io/badge/coverage-local%20only-lightgrey?style=flat-square) -->
+[![Coverage](https://img.shields.io/codecov/c/github/gournge/tanaka-certificates?style=flat-square)](https://codecov.io/gh/gournge/tanaka-certificates)
 
 This repository explores extending the framework of Neural Continuous-Time Supermartingale Certificates [1] to the case of *piecewise* twice continously-differentiable certificates, rather than twice continously-differentiable certificates. This requires using the Itô-Tanaka-Meyer formula, which accounts for *kinks* and the infinitesimal time spent at these kinks.
 
