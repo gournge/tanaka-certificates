@@ -130,6 +130,7 @@ Weakening this assumption could lead to faster verification.
 \vspace{1.2mm}
 % ======================== THREE READING COLUMNS ========================
 \begin{minipage}[t]{.322\textwidth}
+\vspace{0pt}
 \postersection{Introduction}
 We study stochastic differential equations
 \[
@@ -230,6 +231,7 @@ the martingale increment has conditional mean zero. Hence
 \end{minipage}\hfill
 % --------------------------------------------------------
 \begin{minipage}[t]{.322\textwidth}
+\vspace{0pt}
 \postersection{2. A useful class of non-$C^2$ certificates}
 \postersubsection{2.1 Piecewise-quadratic structure}
 We propose that $V$ has this form:
@@ -239,9 +241,9 @@ We propose that $V$ has this form:
 \]
 where $\phi$ is a fixed continuous piecewise-quadratic activation. The ReLU
 network partitions $K$ into polyhedral cells and, after refinement by $\phi$,
-\[
+$
  V_i(x)=c_i+p_i^\top x+\tfrac12x^\top Q_i x.
-\]
+$
 Thus $\nabla V_i=p_i+Q_ix$ and $\nabla^2V_i=Q_i$, which we use when checking the
 generator and local-time conditions. 
 \begin{infobox}
@@ -334,13 +336,13 @@ layer and found it was difficult to train.
 
 After proposing the Deep Residual ICNN architecture, training became easier
 and we found valid certificates for a simple SDE with loose bounds.
+We trained it by first approximating a martingale with
+$\mathcal L V = - \epsilon$, \textit{disabling the ICNN branch} and then fitting $S_\theta$ with linear programming.
 
 \end{minipage}\hfill
 % --------------------------------------------------------
 \begin{minipage}[t]{.322\textwidth}
-
-\textbf{Training.} We trained it by first numerically approximating a martingale with 
-$\mathcal L V = - \epsilon$, \textit{disabling the ICNN branch} and then fitting $S_\theta$ with linear programming.
+\vspace{0pt}
 
 \begin{center}
 \includegraphics[width=\linewidth]{verifier-guided-poisson-teacher.png}
@@ -428,6 +430,22 @@ verifier = VerifierLocalTimeByConstruction(sde, problem, model)
 verification = verifier.verify()
 assert verification.value == "verified"
 \end{lstlisting}
+
+\vspace{1.1mm}
+\begin{center}
+\begin{minipage}[c]{.18\linewidth}
+  \centering
+  \href{https://filipmorawiec.com/tanaka}{%
+    \includegraphics[width=15mm]{figures/tanaka-qr.png}}
+\end{minipage}\hspace{2mm}%
+\begin{minipage}[c]{.66\linewidth}
+  {\fontsize{9.2}{10.4}\selectfont\bfseries
+   Blogpost and Github repository}\par
+  \vspace{.5mm}
+  {\fontsize{8.1}{9.2}\selectfont\color{AccentDark}
+   \href{https://filipmorawiec.com/tanaka}{filipmorawiec.com/tanaka}}
+\end{minipage}
+\end{center}
 \end{minipage}
 
 \vspace{1.5mm}
