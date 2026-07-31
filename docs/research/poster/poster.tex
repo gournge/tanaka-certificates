@@ -408,15 +408,19 @@ verifying Tanaka certificates and a thorough test suite. Example usage:
 
 \begin{lstlisting}[style=posterpython,
   caption={Verify a piecewise-quadratic certificate.},captionpos=b]
-  # pip install tanaka-certificates
-  from tanaka_certificates import *
+# pip install tanaka-certificates
+from tanaka_certificates import *
 
-  sde, problem = make_enlarged_target_ou_problem()
-  model, _ = train_fixed_pwq_lp() 
-  model.eval()
-  verifier = VerifierLocalTimeByConstruction(sde, problem, model)
-  verification = verifier.verify()
-  assert verification.value == "verified"
+sde, problem = make_enlarged_target_ou_problem()
+model, _ = train_fixed_pwq_lp() # only for that problem for now
+model.eval()
+verifier = VerifierLocalTimeByConstruction(sde, problem, model)
+
+# use when local time is not guaranteed by construction
+# verifier = VerifierPiecewiseQuadratic(sde, problem, model)
+
+verification = verifier.verify()
+assert verification.value == "verified"
 \end{lstlisting}
 \end{minipage}
 
