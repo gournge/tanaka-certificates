@@ -137,8 +137,11 @@ $0\leq\alpha<\beta$ and a \emph{nonnegative} $V:K\to\mathbb R$ satisfying
  \quad \inf_{X_u}V\geq\beta,
  \quad \inf_{\partial K\setminus X_T}V\geq\beta.
 \]
-Let $\tau$ stop the process on reaching $X_T$, $\partial K$, or
+Let $\tau$ be the stopping time of reaching $X_T$, $\partial K$, or
 $\{V\geq\beta\}$.
+
+This key theorem, as a consequence of Ville's inequality, connects the construction of a
+supermartingale to safety bounds for the SDE.
 
 \keyeq{\textbf{Theorem (reach--avoid guarantee).} If
 $V(X_{t\wedge\tau})$ is a supermartingale, then
@@ -146,27 +149,31 @@ $V(X_{t\wedge\tau})$ is a supermartingale, then
  \mathbb P(\tau_{X_u}\wedge\tau_{\partial K}<\tau_{X_T})
  \leq \alpha/\beta.
 \]
-The proof is the maximal inequality for the nonnegative stopped process.}
+So the probability of reaching the unsafe set or leaving the domain before
+reaching the target set is bounded by $\alpha/\beta$.}
+% The proof is the maximal inequality for the nonnegative stopped process.
+% }
 
 \begin{center}
 \includegraphics[width=\linewidth,trim=0 0 0 48,clip]{figures/intro_martingale_committor.pdf}
 \end{center}
 {\fontsize{7.4}{8.4}\selectfont\color{Muted}
 \textbf{Figure 1.} An ideal reach--avoid certificate and realizations of the
-stopped martingale $V(X_{t\wedge\tau})$. Simulations illustrate the process;
-the certificate provides the guarantee.\par}
+stopped martingale $V(X_{t\wedge\tau})$. It's numerically estimated to be a martingale.
+% Simulations illustrate the process;
+% the certificate provides the guarantee.
+\par}
 
 \vspace{1mm}
 \textcolor{Rule}{\rule{\linewidth}{0.7pt}}\par
 \vspace{.7mm}
-\textbf{Following the motivations given above, the following research
+{Following the motivations given above, these research
 questions arise:}\par
 \vspace{.7mm}
 
 \researchq{1}{Can non-$C^2$ certificates be valid?}
-\textbf{Finding:} Yes. The
-It\^o--Tanaka--Meyer formula accounts for kinks and the infinitesimal time
-spent at them.
+\textbf{Finding:} Yes. By applying the
+It\^o--Tanaka--Meyer formula we notice that we have to additionally account for local time.
 \researchq{2}{What is a useful class of certificates?}
 \textbf{Finding:} We
 identify three important properties: piecewise-quadratic structure,
@@ -179,12 +186,12 @@ and several failure modes.
 
 \postersection{1. Validity of non-$C^2$ certificates}
 Let $V$ be continuous and $C^2$ on each polyhedral cell $K_i$. Across a shared
-facet $F$, orient $n_{i\to j,F}$ from $K_i$ to $K_j$ and define the
-normal-gradient jump
+facet $F$, we have a normal vector $n_{i\to j,F} \in \mathbb{R}^d$ from $K_i$ to $K_j$. 
+Define the normal-gradient jump to be
 \[
  \gamma_F(x)=\bigl(\nabla V_j(x)-\nabla V_i(x)\bigr)^\top n_{i\to j,F}.
 \]
-The multidimensional It\^o--Tanaka formula is
+The multidimensional It\^o--Tanaka formula gives
 \begin{align*}
  V(X_{t\wedge\tau})={}&V(X_0)
  +\int_0^{t\wedge\tau}\mathcal LV(X_s)\,ds+M_t\\[-1mm]
@@ -222,7 +229,7 @@ the martingale increment has conditional mean zero. Hence
 \begin{minipage}[t]{.322\textwidth}
 \postersection{2. A useful class of non-$C^2$ certificates}
 \postersubsection{2.1 Piecewise-quadratic structure}
-We parameterize
+We propose that $V$ has this form:
 \[
  V(x)=\sum_{k=1}^m\lambda_k\phi(z_k(x))+c,
  \quad z(x)=\texttt{ReLUNN}(x),
@@ -232,20 +239,19 @@ network partitions $K$ into polyhedral cells and, after refinement by $\phi$,
 \[
  V_i(x)=c_i+p_i^\top x+\tfrac12x^\top Q_i x.
 \]
-Thus $\nabla V_i=p_i+Q_ix$ and $\nabla^2V_i=Q_i$ are explicit, turning the
-generator and interface requirements into algebraic checks.
-
+Thus $\nabla V_i=p_i+Q_ix$ and $\nabla^2V_i=Q_i$, which we apply when checking the
+generator and local-time conditions. 
 \begin{infobox}
-\textbf{Why plain ReLU is insufficient.} For
+\textbf{Why is plain ReLU insufficient?} For
 $dX_t=dt+\sqrt2\,dW_t$ on $[0,1]$, suppose $V(0)<V(1)$. A continuous
 piecewise-linear $V$ satisfying $\gamma_F\leq0$ has nonincreasing slopes, but
 must begin with some positive slope $a_i$. Inside that piece,
 \[
  \mathcal LV=V'+V''=a_i>0,
 \]
-contradicting the generator condition. Kinks alone cannot repair the drift.
-The quadratic $V(x)=2x-x^2$ does:
-$\mathcal LV=(2-2x)-2=-2x\leq0$.
+contradicting the generator condition.
+On the other hand, the quadratic $V(x)=2x-x^2$ works:
+$\mathcal LV-2x\leq0$.
 
 \begin{center}
 \includegraphics[width=.86\linewidth]{../log/figures/motivating_counterexample.pdf}
